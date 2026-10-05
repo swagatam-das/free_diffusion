@@ -1,0 +1,14 @@
+{
+  "experiment": "exp03_inequalities",
+  "timestamp": "2026-08-12T18:27:37",
+  "quadrature_floor_on_D": 9.004531265099924e-05,
+  "points_kept": 57,
+  "points_dropped_below_floor": 3,
+  "max_lsi_ratio": 0.4910618733362577,
+  "max_talagrand_ratio": 0.5217398877070201,
+  "max_hwi_ratio": 0.678385639041668,
+  "all_ratios_below_one": true,
+  "debruijn_median_relative_error": 0.002383979254665189,
+  "debruijn_max_relative_error": 0.28846847056637065,
+  "decay_ratio_max": 1.0
+}

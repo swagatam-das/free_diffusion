@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite the accompanying paper.
+title: "Reference implementation for 'Beyond the Semicircle: Free Diffusion Models with Prescribed Equilibria'"
+abstract: >-
+  Reference implementation accompanying the paper "Beyond the Semicircle: Free Diffusion
+  Models with Prescribed Equilibria" and its extended version.  Implements the forward free
+  Ornstein-Uhlenbeck flow and its spectral marginals, the reverse-time free SDE and probability
+  flow, free denoising score matching, the free functional inequalities, and the design of
+  prescribed equilibria, together with the numerical experiments reported in the paper.
+type: software
+version: 1.0.0
+license: MIT
+authors:
+  - name: "Anonymous Authors"
+keywords:
+  - free probability
+  - denoising diffusion
+  - free Brownian motion
+  - free Ornstein-Uhlenbeck process
+  - free entropy
+  - conjugate variable
+  - Dyson Brownian motion
+  - free Wasserstein distance
+  - displacement convexity
+  - score matching
+  - random matrices

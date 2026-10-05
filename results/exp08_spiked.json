@@ -1,0 +1,18 @@
+{
+  "experiment": "exp08_spiked",
+  "timestamp": "2026-08-20T10:06:53",
+  "N": 600,
+  "n_spikes": 3,
+  "outlier_mass": 0.005,
+  "regularisation_eps": 0.002,
+  "score_table_levels": 300,
+  "alpha_interpolation_relative_error": 0.0030309320651656403,
+  "W1_forward_alpha_0.95": 0.06316961078668641,
+  "W1_forward_alpha_0.79": 0.040230961107823385,
+  "W1_forward_alpha_0.5": 0.01881176564808383,
+  "W1_forward_alpha_0.25": 0.005780443706846624,
+  "W1_reverse_alpha_0.015": 0.002672652023999229,
+  "W1_reverse_alpha_0.056": 0.004301282076780225,
+  "W1_reverse_alpha_0.213": 0.009177936098378546,
+  "W1_reverse_alpha_0.790": 0.019252015637194128
+}

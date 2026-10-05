@@ -1,0 +1,10 @@
+{
+  "experiment": "exp02_transition",
+  "timestamp": "2026-08-12T17:35:38",
+  "a": 1.6,
+  "v_star_theory": 2.5600000000000005,
+  "v_star_threshold_1e-3": 2.5600328537194983,
+  "v_star_extrapolated": 2.559347188752082,
+  "max_relative_error_on_parabola": 0.00019736453717340838,
+  "median_relative_error_on_parabola": 2.8434409997045164e-05
+}

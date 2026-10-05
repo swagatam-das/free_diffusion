@@ -1,0 +1,16 @@
+{
+  "experiment": "exp01_forward",
+  "timestamp": "2026-08-12T19:06:43",
+  "W1_alpha_0.9": 0.001187701545369146,
+  "W1_alpha_0.6": 0.0017857969611989703,
+  "W1_alpha_0.3": 0.0023960887135407814,
+  "W1_alpha_0.08": 0.0017006639828209148,
+  "slope_exact_alpha_0.3": -0.9250726837990311,
+  "slope_exact_alpha_0.6": -0.9674335825922716,
+  "slope_mc_alpha_0.3": -0.5105379082904313,
+  "slope_mc_alpha_0.6": -0.48823959457819394,
+  "Lambda_star": 1.2697605448639393,
+  "alpha_star": 0.28089887640449435,
+  "eigenvalue_crossings": 0,
+  "fraction_outside_support": 0.0
+}

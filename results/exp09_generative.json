@@ -1,0 +1,11 @@
+{
+  "experiment": "exp09_generative",
+  "timestamp": "2026-08-20T11:17:48",
+  "N": 400,
+  "n_training_pairs": 168000,
+  "final_training_loss": 0.0004667952504303863,
+  "W1_learned": 0.07345346385208991,
+  "W1_oracle": 0.06218914826531115,
+  "W1_coordinatewise": 0.12080553295899167,
+  "ratio_coordinatewise_to_oracle": 1.9425500481790086
+}

@@ -1,0 +1,7 @@
+tickers with complete coverage: 470;  N=100, T=1258, L=N/T=0.0795
+MP predicted support [0.5156, 1.6434];  eigenvalue range [0.1200, 32.0189]
+eigenvalues above 1.05 x MP edge: 5;  top-5: [ 2.167  2.631  3.014  4.935 32.019]
+variance fraction in top eigenvalue: 0.3202
+95 smallest eigenvalues: [0.120, 1.677];  fraction inside MP support: 0.47
+W1(best-fit semicircle, real spectrum) = 2.1974
+designed drift b* = -H(mu_hat) on [-0.18, 32.32]: range [-1.587, 2.313]

@@ -1,0 +1,8 @@
+gap 1: T = 0.4018 at u = -0.772  ->  alpha* = 0.2866   (paper: T1=0.4018, T2=0.9201; alpha*=0.2866, 0.4792)
+gap 2: T = 0.9201 at u = 1.102  ->  alpha* = 0.4792   (paper: T1=0.4018, T2=0.9201; alpha*=0.2866, 0.4792)
+
+alpha  components of {psi > 1e-3}
+ 0.05  1
+ 0.30  2
+ 0.49  3
+(a change of count between listed alphas marks a transition; paper: 1 component up to 0.29, 2 for 0.30-0.48, 3 from 0.49)
