@@ -1,12 +1,12 @@
 .POSIX:
-.PHONY: help test quick figures clean distclean lint env reproduce reproduce-dynamics exp01 exp02 exp03 exp04 exp05 exp06 exp07 exp08 exp09
+.PHONY: help test quick figures clean distclean lint env reproduce reproduce-dynamics exp01 exp02 exp03 exp04 exp05 exp06 exp07 exp08 exp09 exp10 exp11 exp12 exp13
 
 PYTHON ?= python3
 EXP    := $(PYTHON) experiments
 
 # Every experiment script, in the order of Section 10 of the paper.
 SCRIPTS := exp01_forward exp02_transition exp03_inequalities exp04_free_vs_classical \
-           exp05_transfer exp06_design_mp exp07_reverse exp08_spiked exp09_generative
+           exp05_transfer exp06_design_mp exp07_reverse exp08_spiked exp09_generative exp10_cross_n exp11_volatility exp12_designed_reverse exp13_target_complexity
 
 help:
 	@echo "Targets:"
@@ -53,6 +53,10 @@ exp06: ; $(PYTHON) experiments/exp06_design_mp.py $(FLAGS)
 exp07: ; $(PYTHON) experiments/exp07_reverse.py $(FLAGS)
 exp08: ; $(PYTHON) experiments/exp08_spiked.py $(FLAGS)
 exp09: ; $(PYTHON) experiments/exp09_generative.py $(FLAGS)
+exp10: ; $(PYTHON) experiments/exp10_cross_n.py $(FLAGS)        # long: use BUDGET via 'python experiments/exp10_cross_n.py --budget 240' and re-run to resume
+exp11: ; $(PYTHON) experiments/exp11_volatility.py $(FLAGS)
+exp12: ; $(PYTHON) experiments/exp12_designed_reverse.py $(FLAGS)
+exp13: ; $(PYTHON) experiments/exp13_target_complexity.py $(FLAGS)        # paper setting: --horizon 40 --snap 0.1 (about 10 minutes; resumable with --budget)
 
 reproduce:
 	bash reproduce/run_all.sh

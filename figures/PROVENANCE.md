@@ -1,6 +1,6 @@
 # Provenance of the committed figures and results
 
-`results/*.json` carries a timestamp for every run.  All nine experiments are
+`results/*.json` carries a timestamp for every run.  All thirteen experiments are
 committed at their full settings (Section 10 of the extended paper).
 
 | Experiment | Paper figures | Committed settings |
@@ -14,6 +14,10 @@ committed at their full settings (Section 10 of the extended paper).
 | `exp07_reverse` | 8 | full: 6e4 particles, 600 midpoint steps |
 | `exp08_spiked` | 9, 10 | full: N = 600, 300 score-table levels |
 | `exp09_generative` | 11 | full: N = 400, 168 000 training pairs |
+| `exp10_cross_n` | 6 | full: trained at N = 100 and 400, tested at N = 50 to 800 (N = 800 for the two-atom law only); 60 000 pairs, 100 epochs, 300 reverse steps; 8, 8, 4, 3 noise draws at N = 50, 100, 200, 400 and one at N = 800 |
+| `exp11_volatility` | 6 | full: N = 150, T = 6, dt = 2e-3, 3000-point grid |
+| `exp12_designed_reverse` | 6 | full: M = 800 forward particles, N = 400 generated eigenvalues, T = 5, five prior samples |
+| `exp13_target_complexity` | 6 | full: M = 400 particles, T = 40, snapshot interval 0.1, f = 1 |
 
 The figures `fig1`, `fig4`-`fig13` are byte-identical to the image files used in
 the papers.
@@ -50,6 +54,12 @@ An earlier version listed `exp06`, the reverse half of `exp08`, and `exp09` as
   not re-run when this file was corrected.
 
 ## Notes
+
+`exp10`, `exp11`, `exp12` and `exp13` were run in time-boxed segments (`--budget`), resuming from `results/cache/` (git-ignored);
+`python experiments/exp10_cross_n.py --report-only` rebuilds the report from the cache, and `--sizes 400 --extra-draws 2` adds noise draws at N = 400. The result for a given seed is the
+same as that of a single uninterrupted run. In `exp10`, noise draws are averaged over 8, 8, 4 runs at N = 50, 100, 200 and
+a single draw is used at N >= 400; the exact score is the N -> infinity free score, so a learned score can fall below it in
+`W1` at finite N.
 
 `exp08` is the slowest experiment: it solves the subordination fixed point at
 every one of 300 schedule levels.  The iteration is warm-started from the

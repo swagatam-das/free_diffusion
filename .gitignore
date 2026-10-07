@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
+.DS_Store
+
+# Generated output.  Uncomment the next two lines if you prefer not to commit
+# figures and results; the paper's figures are committed so that a reader can
+# see them without running anything.
+# figures/
+# results/
+
+# reproduce/: download cache and generated figures
+data/*.csv
+reproduce/make_figures/out/
+
+# LaTeX build products
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.pdf
+
+# resumable-run caches
+results/cache/

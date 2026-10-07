@@ -64,3 +64,30 @@ def report(name: str, values: dict):
             print(f"  {k:<{width}} = {v}")
     print(f"  (written to {path})")
     return payload
+
+# ---- resumable runs: a time budget and a pickle cache of finished units ---------------------------
+import pickle
+import time as _time
+
+_T0 = _time.time()
+
+
+def cache_load(name):
+    """Return the dict of finished units cached for ``name`` (empty if none)."""
+    path = os.path.join(RESULTS, "cache", f"{name}.pkl")
+    if os.path.exists(path):
+        with open(path, "rb") as fh:
+            return pickle.load(fh)
+    return {}
+
+
+def cache_save(name, units):
+    os.makedirs(os.path.join(RESULTS, "cache"), exist_ok=True)
+    with open(os.path.join(RESULTS, "cache", f"{name}.pkl"), "wb") as fh:
+        pickle.dump(units, fh)
+
+
+def out_of_time(args):
+    """True once ``--budget`` seconds have elapsed (0 means no limit).  Scripts that use it save their
+    finished units, exit with status 3, and are simply run again to continue."""
+    return getattr(args, "budget", 0.0) > 0 and (_time.time() - _T0) > args.budget

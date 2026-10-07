@@ -236,6 +236,49 @@ def designed_matrix_path(X0, times, dV, rng=None, dt=1e-3, floor=None):
     return out
 
 
+def sandwich_path(X0, times, b, f, rng=None, dt=1e-3, floor=None, ceil=None):
+    """Integrate ``dX = b(X) dt + f(X) N^{-1/2} dH f(X)`` at the matrix level.
+
+    This is the sandwich-volatility model (10) of the condensed paper (Theorem 8.1
+    of the extended one) with a general drift ``b`` and a general positive weight
+    ``f``.  Both are scalar functions applied spectrally: at each step the current
+    matrix is diagonalised, ``B = U diag(b(lambda)) U*`` and ``F = U diag(f(lambda)) U*``
+    are assembled, and the Euler step is ``X + B dt + N^{-1/2} F dH F``.  With
+    ``f = 1`` it reduces to :func:`designed_matrix_path` (``b = -V'/2``).  As there,
+    the eigenvalues are clipped to ``[floor, ceil]`` before ``b`` and ``f`` are
+    evaluated, which keeps a drift that is singular at an endpoint finite.
+
+    A constant ``f = c`` is only a change of clock: the spectral velocity is
+    ``c^4`` times that of ``f = 1`` (see ``tests/test_sandwich.py``).
+
+    Returns an array of shape ``(len(times), N)`` of sorted eigenvalues.
+    """
+    if rng is None:
+        rng = np.random.default_rng(0)
+    X = np.asarray(X0, dtype=complex)
+    if X.ndim == 1:
+        X = np.diag(X).astype(complex)
+    N = X.shape[0]
+    times = np.asarray(times, dtype=float)
+    out = np.empty((times.size, N))
+
+    t = 0.0
+    for k, t_target in enumerate(times):
+        while t < t_target - 1e-12:
+            h = min(dt, t_target - t)
+            lam, U = np.linalg.eigh(symmetrise(X))
+            lam_c = lam if floor is None else np.maximum(lam, floor)
+            if ceil is not None:
+                lam_c = np.minimum(lam_c, ceil)
+            B = (U * b(lam_c)) @ U.conj().T
+            F = (U * f(lam_c)) @ U.conj().T
+            dH = hermitian_brownian_increment(N, h, rng)
+            X = symmetrise(X + B * h + np.sqrt(1.0 / N) * (F @ dH @ F))
+            t += h
+        out[k] = np.linalg.eigvalsh(symmetrise(X))
+    return out
+
+
 def _repulsion(lam):
     """``sum_{j != i} 1/(lam_i - lam_j)`` computed pairwise."""
     diff = lam[:, None] - lam[None, :]

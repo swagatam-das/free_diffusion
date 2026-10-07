@@ -9,6 +9,8 @@
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
 \usepackage[hidelinks]{hyperref}
 
 % ---------------------------------------------------------------- macros
@@ -49,77 +51,58 @@
 \maketitle
 
 \begin{abstract}
-A growing class of machine-learning objects -- covariance and Gram matrices,
-kernel and attention matrices, MIMO channel matrices, density operators -- are
-naturally spectra rather than coordinate vectors. Building a denoising diffusion
-model for such data by corrupting eigenvalues coordinatewise is not merely
-inelegant: it converges to the wrong limit, because eigenvalues repel rather than
-move independently. Free probability theory supplies the correct forward process,
-with free convolution replacing classical convolution and Voiculescu's conjugate
-variable replacing the score, but constant-coefficient free diffusions have a hidden
-limitation of their own: their only possible equilibrium is the semicircular law,
-whatever the target distribution looks like. We show that state-dependent free
-volatility removes this restriction. For any sufficiently regular compactly
-supported target law, we explicitly construct, through a closed-form
-Hilbert-transform drift, a free Fokker--Planck flow having that law as a stationary
-spectral distribution. Under an additional convex-potential condition, the
-construction admits a globally relaxing diffusion interpretation, reverse-time
-dynamics, and a trainable score. The generalization is genuine rather than
-cosmetic: no change of spectral variable reduces it to the constant-coefficient
-case, and it is a Wasserstein gradient flow only for an explicitly characterized
-family of coefficients that contains no bounded non-constant member. We instantiate
-the construction on the Marchenko--Pastur law, the limiting spectrum of isotropic
-sample covariance matrices, and validate it numerically: the free-versus-coordinatewise
-gap, an exact dimension-independent score driving reverse-time matrix dynamics at
-several matrix sizes, the designed Marchenko--Pastur equilibrium, and end-to-end
-generation with a learned score.
+Many machine-learning objects are spectra rather than coordinate vectors: covariance, Gram,
+kernel, attention and channel matrices. Corrupting the eigenvalues coordinatewise gives the
+wrong limit, because the eigenvalues of a Hermitian matrix repel; the correct limit is a free
+convolution, and the two differ by about two orders of magnitude in Wasserstein distance at
+matrix size $N=2500$. The free Ornstein--Uhlenbeck (OU) flow is the right forward process
+but has the semicircle as its only equilibrium. We study free diffusions
+$\mathrm dX=b(X)\,\mathrm dt+f(X)\,\mathrm dS\,f(X)$ whose stationary spectral law can be
+prescribed: for any sufficiently regular compactly supported target, an explicit
+Hilbert-transform drift makes it stationary. A nonlinear drift alone already reaches other
+equilibria for strictly convex potentials, such as Marchenko--Pastur; a state-dependent
+volatility changes the transient at a fixed equilibrium, and we show that this is neither a
+change of spectral variable nor a gradient flow. A free Tweedie identity reduces score
+estimation to scalar regression on eigenvalues. A learned score generates spectra at matrix
+sizes 50 to 800, and a designed flow with non-constant $f$ is reversed from Marchenko--Pastur
+noise to a two-cluster spectrum. We state which of stationarity, relaxation, well-posedness
+and reverse-time generation are proved and which are only observed.
 \end{abstract}
 
 % ======================================================================
 \section{Introduction}\label{sec:intro}
 % ======================================================================
 
-Denoising diffusion models generate samples by learning to reverse a stochastic
-process that gradually destroys structure \citep{SohlDickstein2015, Ho2020,
-Song2021}. The theory is built for vector-valued data: a forward
-Ornstein--Uhlenbeck flow corrupts $x_0\in\R^d$ with Gaussian noise, and a
-reverse-time SDE driven by the score $\nabla\log p_t$ regenerates it.
+Denoising diffusion models generate samples by learning to reverse a process that
+gradually destroys structure \citep{SohlDickstein2015, Ho2020, Song2021}. The theory is
+written for vector-valued data: a forward Ornstein--Uhlenbeck flow adds Gaussian noise to
+$x_0\in\R^d$, and a reverse-time SDE driven by the score $\nabla\log p_t$ recovers the data.
 
-A growing share of the data machine learning actually operates on is not naturally a
-coordinate vector at all, but a \emph{spectrum}: the eigenvalues of a sample
-covariance or Gram matrix, a kernel or attention matrix, a MIMO channel matrix, or a
-quantum density operator. For such objects the natural invariance is unitary
-conjugation, not coordinate permutation, and the natural summary statistics --
-capacity, generalization bounds, entropy, purity -- are functionals of the spectrum
-alone. The standard machinery of diffusion models -- forward SDE, score, reverse-time
-equation -- is not stated in a form that respects this invariance. This raises a basic
-question: what does it mean to build a diffusion model whose target is a spectrum, and
-does the vector-valued theory even give the right answer if applied naively?
+Much of the data in machine learning is better described by a spectrum than by a vector: the
+eigenvalues of a sample covariance or Gram matrix, of a kernel or attention matrix, or of a
+channel matrix. For these the natural symmetry is unitary conjugation rather than permutation
+of coordinates, and the quantities of interest (capacity, generalization bounds, entropy) are
+functions of the spectrum. The usual machinery is not written in a form that respects this
+symmetry.
 
-\textbf{It does not.} The obvious approach is to treat the $N$ eigenvalues as $N$
-exchangeable scalars and corrupt them with independent Gaussian noise, exactly as
-in the vector-valued theory. For unitarily invariant spectral data this is provably the wrong limit. Eigenvalues of a
-Hermitian matrix perturbed by Hermitian noise do not move independently -- they
-repel -- and the correct large-$N$ limit is governed by \emph{free convolution}
-\citep{VDN1992}, not classical convolution. The two make quantitatively different
-predictions: in our experiments the coordinatewise approximation is off by two
-orders of magnitude relative to the free one (\S\ref{sec:experiments}).
+Applied naively, it gives the wrong answer. Treating the $N$ eigenvalues as exchangeable scalars and adding independent
+Gaussian noise gives the classical convolution of the spectral law with a Gaussian. The
+eigenvalues of a Hermitian matrix perturbed by Hermitian noise do not move independently,
+because they repel, and the large-$N$ limit is the free convolution \citep{VDN1992}. The two
+predictions differ by about two orders of magnitude in $W_1$ at $N=2500$ (Table~\ref{tab:freevsclassical}).
 
-Free probability theory, Voiculescu's noncommutative analogue of classical
-probability, supplies the correct forward process, its own Fokker--Planck equation,
-its own notion of score (the \emph{conjugate variable}), and a reverse-time SDE
-\citep{Dabrowski2014, BianeSpeicher1998}. But building this theory on the direct
-analogue of the vector-valued forward process -- a free Ornstein--Uhlenbeck flow with
-scalar (state-independent) diffusion coefficient -- inherits a second, less obvious
-restriction: \emph{the only possible equilibrium of such a flow is the semicircular
-law}, up to rescaling. Whatever the target spectrum actually is -- Marchenko--Pastur
-for a sample covariance matrix, or whatever an attention or channel matrix produces
--- the constant-coefficient construction can only ever generate the semicircle.
-Figure~\ref{fig:warmup} illustrates all three regimes at a glance.
+Free probability supplies the correct forward process, its own Fokker--Planck equation, a
+notion of score (Voiculescu's conjugate variable) and a reverse-time SDE
+\citep{Dabrowski2014, BianeSpeicher1998}. The direct analogue of the vector forward process
+is a free Ornstein--Uhlenbeck (OU) flow, with linear drift and constant diffusion coefficient, and
+its only equilibrium is the semicircular law up to scaling. For a target such as
+Marchenko--Pastur, the spectrum of a sample covariance matrix, this flow can only generate the
+semicircle. A nonlinear drift changes this (\S\ref{sec:design}). Figure~\ref{fig:warmup} shows
+the three cases.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig_warmup.png}
+\includegraphics[width=\textwidth]{fig_warmup.png}
 \caption{Three ways to corrupt a spectrum, and what each can produce as an
 equilibrium. Left: coordinatewise noise gives the wrong limit entirely. Middle: the
 correct (free) process, but only ever semicircular. Right: this paper -- an
@@ -127,46 +110,43 @@ arbitrary designed target.}
 \label{fig:warmup}
 \end{figure}
 
-\paragraph{Scope.} The object generated throughout is a \emph{spectral law}, the
-eigenvalue distribution of a unitarily invariant matrix ensemble. Eigenvector information
-is intentionally outside the model: this is a generative model of spectral distributions,
-not of arbitrary matrices.
+\paragraph{Scope.} What is generated is the spectral law of a unitarily invariant matrix ensemble.
+Eigenvectors are not modeled, and neither are constraints such as positivity, fixed trace or
+rank. Covariance matrices and density operators enter only through their spectral law, and the
+free OU flow preserves neither positivity nor trace.
 
-\paragraph{Contributions.} Three main results, following Figure~\ref{fig:warmup}, and a
-group of structural results.
+\paragraph{Contributions.}
+\emph{1. The correct spectral corruption.} For unitarily invariant data, coordinatewise
+corruption gives the classical limit $\mu_0*\mathcal N(0,v)$, while Hermitian corruption
+gives the free limit $\mu_0\boxplus\gamma_v$. Their fourth moments differ by exactly
+$v(2m_2+v)$, and their $W_1$ distances to the simulated spectrum by two orders of magnitude at
+$N=2500$ (\S\ref{sec:naive}). The free OU flow built on the free limit is the correct forward
+process, but it has a single equilibrium.
 
-\emph{1. The correct spectral diffusion.} For unitarily invariant spectral data,
-coordinatewise corruption yields the classical limit $\mu_0*\mathcal N(0,v)$ and
-Hermitian corruption the free limit $\mu_0\boxplus\gamma_v$; they differ at the fourth
-moment by exactly $v(2m_2+v)$ and by two orders of magnitude in $W_1$ at $N=2500$
-(\S\ref{sec:naive}).
-
-\emph{2. Equilibrium design (the central result).} Letting the diffusion coefficient
-depend on the state removes the semicircular restriction: for any sufficiently regular
-compactly supported target $\mu_*$ and positive weight $f$ (Theorem~\ref{thm:design}),
+\emph{2. Free diffusions with a prescribed stationary law.} For any sufficiently regular
+compactly supported $\mu_*$ and any $f>0$ (Theorem~\ref{thm:design}),
 \[
   \boxed{\;b_*(x)=-f(x)^2\,H(f^2\mu_*)(x)\;}
 \]
-makes $\mu_*$ a stationary spectral law of
-$\dd X_t=b_*(X_t)\,\dd t+f(X_t)\,\dd S_t\,f(X_t)$. We keep three levels of claim apart
-(\S\ref{sec:design}): stationarity of the continuity equation, for every regular target;
-relaxation, reversal and a trainable score, for strictly convex potentials
-(Corollary~\ref{cor:designconvex}; Marchenko--Pastur is an instance); and well-posedness
-of the SDE, not established in general.
+makes $\mu_*$ stationary for $\dd X_t=b_*(X_t)\,\dd t+f(X_t)\,\dd S_t\,f(X_t)$. With $f\equiv1$
+this is free Langevin dynamics. It reaches non-semicircular laws and relaxes when the potential
+is strictly convex (Corollary~\ref{cor:designconvex}; Marchenko--Pastur), so a state-dependent
+volatility is not needed for that. What $f$ adds is freedom in the transient at a fixed equilibrium.
+For a given target the $f\equiv1$ flow is unique, a constant $f$ only rescales time, and a
+non-constant $f$ gives a different flow with the same stationary law. No change of spectral
+variable reduces such a flow to constant volatility (Theorem~\ref{thm:lamperti}), and it is a
+Wasserstein gradient flow only for an explicit family of coefficients that contains no bounded
+non-constant member (Theorem~\ref{thm:nogradient}). Theorem~\ref{thm:gapclosing} gives the time at
+which a gap in the spectrum closes along the forward flow.
 
-\emph{3. A generative realization.} A free Tweedie identity (\S\ref{sec:background})
-reduces score estimation to regression of a scalar function of eigenvalue and noise
-level, whose parameterization is independent of the matrix size $N$;
-\S\ref{sec:experiments} validates it with an exact score at several $N$ and a learned
-score at one $N$.
+\emph{3. A trainable spectral score.} The free Tweedie identity turns the noncommutative score into an
+ordinary regression target: a scalar function of an eigenvalue and the noise level, learned from noisy spectra. A score learned at
+one matrix size generates spectra at other sizes from 50 to 800 (\S\ref{sec:experiments}), and a designed flow with non-constant $f$ is
+reversed, with its exact velocity field, from Marchenko--Pastur noise to a two-cluster spectrum. The learned-score experiments use
+the free OU flow.
 
-\emph{Structural results.} No diffeomorphism of the spectral line reduces non-constant
-state-dependent volatility to a constant one (Theorem~\ref{thm:lamperti}); the flow is a
-Wasserstein gradient flow only for an explicitly characterized family of coefficients
-containing no bounded non-constant member (Theorem~\ref{thm:nogradient}); and an
-explicit threshold governs when a spectral gap survives partway through the forward
-corruption (Theorem~\ref{thm:gapclosing}). Proofs and further experiments are in the
-appendix.
+Section~\ref{sec:design} separates four properties of a flow with a prescribed equilibrium and
+states which of them we prove.
 
 % ======================================================================
 \section{Background}\label{sec:background}
@@ -199,8 +179,7 @@ a \emph{nonlocal} Fokker--Planck equation carried by the Hilbert transform,
 \end{equation}
 where $H\mu_t(x)=\pv\!\int\frac{\dd\mu_t(y)}{x-y}$ is the Hilbert transform,
 a complex Burgers equation, solved explicitly and uniquely, in the class of Cauchy
-transforms of probability measures (this is the right uniqueness class for the
-problem, not merely a convenient one; see Appendix~\ref{app:diperna}), by
+transforms of probability measures (this is the natural uniqueness class; see Appendix~\ref{app:diperna}), by
 \begin{equation}
 \mu_t=D_{\sqrt{\alpha_t}}\mu_0\boxplus\gamma_{1-\alpha_t}
 \end{equation}
@@ -208,12 +187,12 @@ with $\alpha_t=e^{-\int_0^t\beta}$; for every $t>0$ this $\mu_t$ has a bounded,
 real-analytic density on the interior of its support (Biane's regularity theorem),
 regardless of the regularity of $\mu_0$. As $t\to\infty$,
 $\mu_t\to\gamma_1$, the semicircular law, regardless of $\mu_0$: this is the
-restriction our main result removes.
+restriction that \S\ref{sec:design} addresses.
 
 \paragraph{Free score and reverse-time SDE.} Voiculescu's \emph{conjugate variable}
 $\xi_{\mu_t}:=2H\mu_t$ is the free analogue of the negative score $-\nabla\log p_t$
 (both equal $x$ for the standard Gaussian, respectively semicircular, law);
-Table~\ref{tab:dictionary} gives the dictionary. Specializing the time reversal of free diffusions
+Table~\ref{tab:dictionary} (Appendix~\ref{app:further}) gives the dictionary. Specializing the time reversal of free diffusions
 \citep{Dabrowski2014} to \eqref{eq:ffwd} gives the reverse-time free SDE
 \begin{multline}\label{eq:reversesde}
   \dd Y_s = \big[\tfrac12\beta(T\!-\!s)Y_s \\
@@ -230,46 +209,18 @@ problem with an exact consistency guarantee (deferred to
 Appendix~\ref{app:tweedie}), the free analogue of denoising score matching
 \citep{Vincent2011, Hyvarinen2005}.
 
-\begin{table}[t]
-\centering
-\caption{Dictionary between classical and free spectral diffusion.}
-\label{tab:dictionary}
-\small
-\begin{tabular}{@{}p{0.42\columnwidth}p{0.52\columnwidth}@{}}
-\toprule
-Classical (vectors) & Free (spectra)\\
-\midrule
-Gaussian convolution & free convolution $\boxplus\gamma_v$\\
-score $-\nabla\log p_t$ & conjugate variable $\xi_{\mu_t}=2H\mu_t$\\
-Tweedie, denoising score matching & free Tweedie identity (App.~\ref{app:tweedie})\\
-reverse SDE & reverse free SDE \eqref{eq:reversesde}\\
-constant-coefficient limit: Gaussian & constant-coefficient limit: semicircle only\\
-Langevin drift $\tfrac12\nabla\log p_*$ & $b_*=-H\mu_*=-\tfrac12\xi_{\mu_*}$ ($f\equiv1$)\\
-\bottomrule
-\end{tabular}
-\end{table}
 
-\paragraph{Free entropy and functional inequalities.} Two functionals organize the
-convexity theory this paper relies on. Voiculescu's free entropy and the free energy
-relative to the quadratic potential are
-\begin{align}
-  \Ent[\mu] &= \iint\log\abs{s-t}\,\dd\mu(s)\dd\mu(t)+\tfrac34+\tfrac12\log2\pi,\\
-  \Free[\mu] &= \tfrac12\!\int\! x^2\dd\mu(x) - \Ent[\mu],
-\end{align}
-and, writing $\Div(\mu\Vert\gamma):=\Free[\mu]-\Free[\gamma]$ for the relative free
-energy and $\relF(\mu\Vert\gamma):=\int(x-\xi_\mu(x))^2\dd\mu(x)$ for the relative
-free Fisher information, $\Free$ is $1$-displacement-convex along free Wasserstein
-geodesics \citep{Biane2003}. This single fact yields the free logarithmic Sobolev inequality
-$\Div\le\tfrac12\relF$ \citep{Biane2003}, the Talagrand inequality $\Wt^2\le2\Div$
-\citep{HiaiPetzUeda2004}, and the HWI inequality $\Div\le\Wt\sqrt{\relF}-\tfrac12\Wt^2$
-\citep{LedouxPopescu2009}, each between $\mu$ and $\gamma$ (HWI implies the other two),
-together with the de~Bruijn identity
-$\tfrac{\dd}{\dd\Lambda}\Div(\mu_t\Vert\gamma)=-\tfrac12\relF(\mu_t\Vert\gamma)$ and
-exponential decay $\Div(\mu_t\Vert\gamma)\le e^{-\Lambda(t)}\Div(\mu_0\Vert\gamma)$,
-$\Lambda(t)=\int_0^t\beta$. Corollary~\ref{cor:designconvex} shows this entire
-apparatus transfers verbatim to any strictly convex confining potential $V$ in place
-of $\tfrac12x^2$, which is what makes the equilibrium-design construction of
-\S\ref{sec:design} more than an existence statement.
+\paragraph{Free entropy and functional inequalities.} With Voiculescu's free entropy
+$\Ent[\mu]=\iint\log\abs{s-t}\,\dd\mu(s)\dd\mu(t)+\tfrac34+\tfrac12\log2\pi$ and the free energy
+$\Free[\mu]=\tfrac12\!\int\! x^2\dd\mu-\Ent[\mu]$, $\Free$ is $1$-displacement-convex along free
+Wasserstein geodesics \citep{Biane2003}. Writing $\Div(\mu\Vert\gamma)=\Free[\mu]-\Free[\gamma]$ and
+$\relF(\mu\Vert\gamma)=\int(x-\xi_\mu)^2\dd\mu$ for the relative free Fisher information, this yields the free
+log-Sobolev inequality $\Div\le\tfrac12\relF$ \citep{Biane2003}, the Talagrand inequality
+$\Wt^2\le2\Div$ \citep{HiaiPetzUeda2004} and the HWI inequality \citep{LedouxPopescu2009}, the de~Bruijn identity
+$\tfrac{\dd}{\dd\Lambda}\Div(\mu_t\Vert\gamma)=-\tfrac12\relF(\mu_t\Vert\gamma)$, and exponential decay
+$\Div(\mu_t\Vert\gamma)\le e^{-\Lambda(t)}\Div(\mu_0\Vert\gamma)$ with $\Lambda(t)=\int_0^t\beta$.
+Corollary~\ref{cor:designconvex} transfers this apparatus to any strictly convex confining potential $V$ in
+place of $\tfrac12x^2$ (Appendix~\ref{app:inequalities}).
 
 \paragraph{Matrix realization.} All of this is the $N\to\infty$ limit of a concrete,
 simulable object: $N\times N$ Hermitian matrix diffusions $\dd X^N_t = b(X^N_t)\,\dd
@@ -278,43 +229,35 @@ spectral distribution converges to $\mu_t$ \citep{Dyson1962, RogersShi1993}. Thi
 what we simulate throughout \S\ref{sec:experiments}.
 
 % ======================================================================
-\section{Why the naive constructions fail}\label{sec:naive}
+\section{Corruption of a spectrum}\label{sec:naive}
 % ======================================================================
 
-Two direct ways of building a diffusion model on spectra are available before
-introducing anything free-probabilistic. Both fail, for different reasons.
+\paragraph{Coordinatewise corruption.} Treat the $N$ eigenvalues
+$\lambda=(\lambda_1,\dots,\lambda_N)$ as exchangeable scalars and add independent Gaussian
+noise, as in the vector case. The spectral law becomes the classical convolution
+$\mu_0*\mathcal N(0,v)$. The eigenvalues of a Hermitian matrix with Hermitian noise do not
+behave this way: they repel, and the limit is the free convolution $\mu_0\boxplus\gamma_v$. The
+two already differ in their support, which is compact for $\mu_0\boxplus\gamma_v$ and all of
+$\R$ for $\mu_0*\mathcal N(0,v)$, and their fourth moments differ by exactly $v(2m_2+v)$
+(Appendix~\ref{app:freevsclassical}). At $N=2500$ the free prediction agrees with the simulated
+spectrum up to finite-$N$ fluctuations, and the coordinatewise prediction is off by two orders
+of magnitude (Table~\ref{tab:freevsclassical}).
 
-\paragraph{Coordinatewise corruption is wrong, not just inefficient.} Treat the $N$
-eigenvalues $\lambda=(\lambda_1,\dots,\lambda_N)$ as exchangeable scalars and corrupt
-them with independent Gaussian noise, exactly as the vector-valued theory prescribes.
-This gives the classical convolution $\mu_0 * \mathcal N(0,v)$. But eigenvalues of a
-Hermitian matrix corrupted by Hermitian noise do not move independently: they repel,
-and the correct limit is the free convolution $\mu_0\boxplus\gamma_v$. The two differ
-even in gross qualitative features -- $\mu_0\boxplus\gamma_v$ has compact support,
-$\mu_0*\mathcal N(0,v)$ does not -- and their fourth moments differ by exactly
-$v(2m_2+v)$ (Appendix~\ref{app:freevsclassical}). Table~\ref{tab:freevsclassical}
-quantifies the gap: at $N=2500$ the free prediction tracks the truth to
-finite-$N$-fluctuation accuracy, while the coordinatewise prediction is off by two
-orders of magnitude.
-
-\paragraph{The correct (free) forward process has a hidden restriction.} Once
-corruption is modeled correctly by \eqref{eq:ffwd}, the forward flow converges to the
-semicircular law $\gamma_1$ for \emph{every} initial law $\mu_0$, because that is the
-only equilibrium a constant-coefficient free Ornstein--Uhlenbeck process can have. A
-diffusion model built directly on \eqref{eq:ffwd} therefore cannot represent target
-spectra such as Marchenko--Pastur, or whatever an attention or channel matrix
-produces, except as the byproduct of a schedule that never quite finishes. Making the
-equilibrium a design choice is the content of \S\ref{sec:design}.
+\paragraph{The free OU flow has one equilibrium.} With the corruption modeled by
+\eqref{eq:ffwd}, the forward flow converges to the semicircular law $\gamma_1$ for every
+initial law $\mu_0$, since that is the only equilibrium of a free Ornstein--Uhlenbeck process,
+that is, of linear drift and constant volatility. A diffusion model built on \eqref{eq:ffwd}
+therefore reaches a target such as Marchenko--Pastur only as a by-product of a schedule that is
+stopped early. Making the equilibrium a design choice is the subject of \S\ref{sec:design}.
 
 % ======================================================================
 \section{Designing the equilibrium}\label{sec:design}
 % ======================================================================
 
-We allow the volatility to depend on the current state, using the sandwich
-coefficient $f(X)\,\dd S\,f(X)$ -- so that $f(X)$, an operator-valued coefficient built
-from $X$ itself, plays the role a scalar diffusion coefficient plays classically
-(the unique choice compatible with self-adjointness
-of the noise term up to symmetrization; see Appendix~\ref{app:selfadjoint}):
+Let the volatility depend on the state through the sandwich coefficient
+$f(X)\,\dd S\,f(X)$, so that $f(X)$ plays the role that a scalar diffusion coefficient plays
+classically. This is the form compatible with self-adjointness of the noise term, up to
+symmetrization (Appendix~\ref{app:selfadjoint}):
 \begin{equation}\label{eq:opsde}
   \dd X_t = b(X_t)\,\dd t + f(X_t)\,\dd S_t\,f(X_t).
 \end{equation}
@@ -322,9 +265,9 @@ of the noise term up to symmetrization; see Appendix~\ref{app:selfadjoint}):
 \begin{theorem}[Spectral dynamics under sandwich volatility]\label{thm:opvol}
 Let $f$ be bounded and continuous and $b$ bounded and Lipschitz. The spectral law
 $\mu_t$ of the solution of \eqref{eq:opsde} satisfies
-$\partial_t\mu_t+\partial_x(\mu_t V_t)=0$ with velocity field
+$\partial_t\mu_t+\partial_x(\mu_t V_t)=0$ with velocity field, where $\eta_t=f^2\mu_t$ is the weighted measure,
 \begin{equation}\label{eq:opvelocity}
-  V_t(x)=b(x)+f(x)^2\,H\eta_t(x),\qquad \dd\eta_t := f(x)^2\dd\mu_t(x).
+  V_t(x)=b(x)+f(x)^2\,H\eta_t(x),\qquad \eta_t:=f^2\mu_t.
 \end{equation}
 \end{theorem}
 
@@ -334,22 +277,63 @@ summarizes end to end.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig_pipeline.png}
+\includegraphics[width=\textwidth]{fig_pipeline.png}
 \caption{The equilibrium-design construction: a target law $\mu_*$ determines,
 through a single Hilbert-transform formula, a drift $b_*$ for which $\mu_*$ itself is a
 stationary spectral law of the free flow.}
 \label{fig:pipeline}
 \end{figure}
 
-\paragraph{Three levels of claim.} ``A free diffusion with prescribed equilibrium'' can
-mean three things, which we keep apart. \textbf{(I) Stationarity:} the constant path
-$\mu_t\equiv\mu_*$ solves the continuity equation of Theorem~\ref{thm:opvol}, i.e.\ $V$
-vanishes on $\supp\mu_*$. \textbf{(II) Relaxation:} the flow also relaxes to $\mu_*$
-exponentially fast (the gradient-flow regime of Corollary~\ref{cor:designconvex}).
-\textbf{(III) Well-posed realization:} the SDE \eqref{eq:opsde} with drift $b_*$ has a
-unique solution. Theorem~\ref{thm:design} proves (I) for every regular target,
-Corollary~\ref{cor:designconvex} gives (II) for strictly convex potentials, and (III) is
-not established in general (\S\ref{sec:limitations}).
+\paragraph{Four model classes.} Table~\ref{tab:classes} lists the models used below. A nonlinear
+drift with constant volatility (b) already escapes the semicircle, a constant $f$ (c) only rescales
+time (Appendix~\ref{app:further}), and (d) is what the sandwich coefficient adds. In short, the drift
+chooses the equilibrium, while a non-constant volatility changes the route taken to it
+(Figure~\ref{fig:concept}).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\linewidth]{fig_concept.png}
+\caption{The drift chooses the equilibrium (left). A non-constant volatility changes the route to a fixed
+equilibrium (right: Marchenko--Pastur, \S\ref{sec:experiments}).}
+\label{fig:concept}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{The four model classes, all of the form \eqref{eq:opsde}.}
+\label{tab:classes}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.43\columnwidth}>{\raggedright\arraybackslash}p{0.5\columnwidth}@{}}
+\toprule
+model & equilibria and results\\
+\midrule
+(a) free OU: linear drift, $f\equiv1$ & only $\gamma_1$ (Prop.~\ref{prop:designunique})\\[3pt]
+(b) free Langevin: \textbf{nonlinear drift}, $f\equiv1$ & any regular $\mu_*$, with a unique drift (Thm.~\ref{thm:design}); relaxes if $V$ is strictly convex (Cor.~\ref{cor:designconvex})\\[3pt]
+(c) clock change: nonlinear drift, $f\equiv c$ & as (b), at clock $c^4$\\[3pt]
+(d) state-dependent volatility: nonlinear drift, \textbf{non-constant $f$} & any regular $\mu_*$ (Thm.~\ref{thm:design}); not a change of variable (Thm.~\ref{thm:lamperti}); not a gradient flow if bounded (Thm.~\ref{thm:nogradient})\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Four properties.} A flow with a prescribed equilibrium can have four different properties,
+which we keep apart.
+\begin{description}[leftmargin=0pt,itemsep=1pt,topsep=2pt,parsep=0pt,font=\normalfont\bfseries]
+\item[(I) Stationarity.] The constant path $\mu_t\equiv\mu_*$ solves the continuity equation of
+Theorem~\ref{thm:opvol}. Theorem~\ref{thm:design} proves it for every regular target and every $f$.
+\item[(II) Relaxation.] The flow converges to $\mu_*$, exponentially fast. Proved for $f\equiv1$ and strictly convex
+potentials (Corollary~\ref{cor:designconvex}); for non-constant $f$ the flow is not a gradient flow
+(Theorem~\ref{thm:nogradient}) and relaxation is only observed (\S\ref{sec:experiments}).
+\item[(III) Well-posedness.] The SDE \eqref{eq:opsde} with drift $b_*$ has a unique solution. This is not
+established in general.
+\item[(IV) Reverse-time generation.] A sampler started from the equilibrium regenerates the data law. For
+the free OU flow: Tweedie identity and consistency (Theorem~\ref{thm:consistency}), with exact and learned scores.
+For a designed flow with non-constant $f$: shown numerically, deterministically, with the exact velocity field
+(\S\ref{sec:experiments}); there is no reverse-time SDE and no learned velocity for such flows.
+\end{description}
+Stationarity does not imply reachability: the S\&P~500 target $\hat\mu_*$ is stationary by construction,
+but the simulated flow does not reach its isolated outliers, and targets with gaps are approached slowly
+(\S\ref{sec:experiments}).
 
 \begin{theorem}[Equilibrium design]\label{thm:design}
 Let $\mu_*$ be a compactly supported probability measure with a H\"older continuous
@@ -361,7 +345,7 @@ is well defined and H\"older continuous on compact subsets of the interior of $K
 (and, if $\mu_*$'s density vanishes at the edges of $K$ at a H\"older rate, on all of
 $K$), and $\mu_*$ is a stationary solution of the spectral continuity equation of
 Theorem~\ref{thm:opvol} for \eqref{eq:opsde} with drift $b_*$ and weight $f$
-(Level~I).
+(property~I).
 \end{theorem}
 
 \begin{proof}[Proof sketch]
@@ -376,7 +360,7 @@ edge case and a companion uniqueness statement, in Appendix~\ref{app:design}.
 If in addition $\mu$'s density vanishes at every edge of $K$ (a soft edge, as for
 Marchenko--Pastur or the semicircle), then $b_*$ is the \emph{only} bounded continuous
 drift, paired with $f$, for which $\mu$ is stationary; and semicircular is the only
-stationary law of any constant-coefficient free OU flow, by strict displacement
+stationary law of any free OU flow, by strict displacement
 convexity of $\mathcal F$ (Appendix~\ref{app:inequalities}).
 \end{proposition}
 
@@ -401,12 +385,12 @@ unbounded; see Appendix~\ref{app:design} for the precise statement and
 \citet{WeiYin2026} for the relevant well-posedness theory.
 \end{example}
 
-\subsection{Two obstructions: the generalization is genuine}\label{sec:obstructions}
+\subsection{Non-reducibility}\label{sec:obstructions}
 
-A natural objection is that state-dependent free volatility might secretly reduce to the
-constant-coefficient case already understood -- either by a change of spectral
-variable, as the classical Lamperti transform does, or by being a Wasserstein
-gradient flow after all. Both fail.
+One might ask whether state-dependent volatility reduces to the constant-volatility case that
+is already understood, either by a change of spectral variable, as the classical Lamperti
+transform does, or because the flow is a Wasserstein gradient flow after all. Neither is the
+case.
 
 \begin{theorem}[No spectral Lamperti reduction]\label{thm:lamperti}
 No diffeomorphism $g$ of $\R$ conjugates the spectral flow of \eqref{eq:opsde}, for
@@ -415,35 +399,32 @@ affine and $f$ is constant.
 \end{theorem}
 
 \begin{theorem}[Gradient-flow characterization]\label{thm:nogradient}
-The spectral flow of \eqref{eq:opsde} is the $m$-mobility Wasserstein gradient flow
-of a pairwise-interaction energy for every initial law \emph{if and only if}
+Let $f>0$ be defined on $\R$. The spectral flow of \eqref{eq:opsde} is the $m$-mobility
+Wasserstein gradient flow of a pairwise-interaction energy for every compactly supported
+initial law \emph{if and only if}
 \begin{equation}\label{eq:gradflowclass}
-  f(x)^4 = \kappa x^2+\lambda x+\nu > 0\ \text{on } \R,\qquad m = f^4/c,\ c>0,
+  f(x)^4 = \kappa x^2+\lambda x+\nu > 0\ \text{on } \R,\qquad m = f^4/c,\ c>0.
 \end{equation}
-a two-parameter family of coefficients. Among bounded positive $f$ the only member of
-this family is the constant case $\kappa=\lambda=0$, since a positive quadratic is
-bounded only when it is constant; the non-constant members, such as
-$f(x)=(x^2+1)^{1/4}$, are unbounded.
+Here the $m$-mobility gradient flow of an energy $E$ is $\partial_t\mu=\partial_x(m\mu\,\partial_x
+\tfrac{\delta E}{\delta\mu})$. A positive quadratic on $\R$ is bounded only if it is constant, so
+among bounded $f$ the only member of the family is the constant case $\kappa=\lambda=0$; the
+non-constant members, such as $f(x)=(x^2+1)^{1/4}$, are unbounded.
 \end{theorem}
 
-Both proofs (Appendix~\ref{app:obstructions}) trace to the same mechanism: the
-Hilbert transform of a pushforward measure is not the pushforward of the Hilbert
-transform, so the nonlocal term in \eqref{eq:opvelocity} does not commute with either
-reparametrization or the local structure a gradient flow requires. A further
-proposition (Appendix~\ref{app:obstructions}) shows that allowing $k$-body
-interaction energies for any finite $k$ does not enlarge the family
-\eqref{eq:gradflowclass} either. The practical consequence: for the bounded,
-non-constant coefficients this paper's well-posedness theory covers
-(Theorem~\ref{thm:opvol}), the convexity toolkit of Appendix~\ref{app:inequalities}
-is unavailable, and Theorem~\ref{thm:design}'s direct-substitution argument is not a
-detour around harder analysis -- it is the only route available.
+Thus, among bounded positive volatilities the only gradient-flow member is the constant one, and a non-constant bounded $f$ changes the dynamics instead of merely reparameterizing it. Both proofs (Appendix~\ref{app:obstructions}) rest on one fact: the Hilbert transform of a pushforward measure is not the
+pushforward of the Hilbert transform, so the nonlocal term in \eqref{eq:opvelocity} commutes neither with a change of variable
+nor with the structure of a gradient flow. Allowing $k$-body interaction energies does not enlarge the family
+\eqref{eq:gradflowclass} (Appendix~\ref{app:obstructions}). Theorem~\ref{thm:nogradient} is about $f$ defined on all of $\R$ and all
+compactly supported initial laws; if only laws supported in a fixed interval $K$ are admitted, the same proof gives $f^4$ quadratic
+on $K$, which can be bounded. The coefficient used in \S\ref{sec:experiments}, $f^2(x)=\tfrac12+\tfrac{3x}{2(1+x)}$, has $f^4$ rational
+and not a polynomial, so it is not of this form on any interval. For such coefficients the convexity theory of
+Appendix~\ref{app:inequalities} does not apply, and we use direct substitution, as in Theorem~\ref{thm:design}.
 
 \subsection{When does a spectral gap survive?}\label{sec:gapclosing}
 
-A third question the design construction raises: if $\mu_*$ has a gap in its support
--- as, e.g., a mixture of well-separated clusters would -- does the forward flow
-\eqref{eq:ffwd} that trains a diffusion model on such data close that gap
-instantaneously, or does the gap persist for a while? The answer is quantitative.
+The forward flow \eqref{eq:ffwd} that trains the model also closes gaps in the spectrum. If
+$\mu_0$ has a gap, as a mixture of separated clusters would, the gap does not close at once;
+the following gives the time.
 
 \begin{theorem}[Gap closing along the free OU flow]\label{thm:gapclosing}
 Let $\mu_0$ be compactly supported with a bounded gap $(\alpha_-,\alpha_+)$ in its
@@ -454,28 +435,26 @@ gap of $\supp\mu_t$ persists exactly while $\alpha_t > T/(1+T)$, closing at
 $\Lambda(t)=\log(1+1/T)$.
 \end{theorem}
 
-The threshold is a genuine potential-theoretic quantity: $\Theta_{\mu_0}=-G_{\mu_0}'$,
-minus the second derivative of $\mu_0$'s logarithmic potential, so a gap with small
-curvature (a wide, shallow gap) closes late, and a sharp one closes early
-(Appendix~\ref{app:gapclosing}). Proof and a two-independent-gap numerical check are
-in Appendix~\ref{app:gapclosing}.
+The threshold is a potential-theoretic quantity: $\Theta_{\mu_0}=-G_{\mu_0}'$ is minus the
+second derivative of the logarithmic potential of $\mu_0$, so a shallow gap closes late and a
+sharp one closes early (Appendix~\ref{app:gapclosing}). This concerns the forward corruption,
+not the designed flows.
 
 % ======================================================================
 \section{Training and sampling}\label{sec:algorithm}
 % ======================================================================
 
-Equation~\eqref{eq:reversesde} requires $\xi_{\mu_t}$, unavailable in closed form
-from data. The free Tweedie identity of \S\ref{sec:background} turns its estimation
-into a regression problem: given a denoiser $g_\theta$, define
+Equation~\eqref{eq:reversesde} needs $\xi_{\mu_t}$, which is not available in closed form
+from data. The free Tweedie identity of \S\ref{sec:background} turns its estimation into a
+regression problem: for a denoiser $g_\theta$, let
 \begin{equation}\label{eq:loss}
   \mathcal L(\theta)=\int_0^T\!\! w(t)\,\tau\big[(g_\theta(X_t,t)-\sqrt{\alpha_t}X_0)^2
-  \big]\dd t,
+  \big]\dd t.
 \end{equation}
-whose minimizer recovers $\xi_{\mu_t}$ exactly (Appendix~\ref{app:tweedie}). For
-unitarily invariant data the optimal denoiser acts spectrally, so the object learned
-is a single scalar function $h_\theta(\lambda,\alpha_t)$ whose parameterization does not
-depend on the matrix size $N$, so one score can in principle serve every $N$ (tested
-with the exact score in \S\ref{sec:experiments}).
+Its minimizer recovers $\xi_{\mu_t}$ exactly (Theorem~\ref{thm:consistency}). For
+unitarily invariant data the optimal denoiser acts spectrally, so what is learned is a scalar
+function $h_\theta(\lambda,\alpha_t)$ whose parameterization does not depend on the matrix size
+$N$. In this sense one score can serve every $N$; \S\ref{sec:experiments} tests this.
 
 \begin{algorithmenv}[Training and sampling]\label{alg:main}
 \textbf{Training.} Sample $X_0^N$, $t\sim\mathrm{Unif}[0,T]$, GUE noise $H$; form
@@ -487,91 +466,29 @@ matrix form backwards by Euler--Maruyama, applying $\widehat\xi_t$ spectrally at
 each step and re-symmetrizing.
 \end{algorithmenv}
 
-\paragraph{Cost.} The score is dimension-independent in parameterization, not in
-computation: each step of the dense implementation diagonalizes an $N\times N$ matrix at
-$O(N^3)$ cost, and reducing this is left open.
+\paragraph{Cost.} The score does not depend on $N$ in its parameterization, but each step of the dense implementation
+diagonalizes an $N\times N$ matrix at $O(N^3)$ cost ($0.003$, $0.013$ and $0.096$ s per reverse step at $N=100$, $200$, $400$ on one CPU core).
+Reducing it is left open.
 
 % ======================================================================
 \section{Experiments}\label{sec:experiments}
 % ======================================================================
 
-All experiments use Hermitian matrix diffusions at the stated $N$; further experimental detail is in
-Appendices~\ref{app:experiments} and~\ref{app:realdata}.
+All experiments use Hermitian matrix diffusions at the stated $N$. Code and settings are in the
+accompanying repository. The
+experiments on corruption, exact scores and learned scores use the free OU forward flow, for
+which the free Tweedie identity holds exactly. The designed flows are tested forward, for
+stationarity and relaxation, and in one experiment they are reversed with the exact velocity
+field.
 
-\paragraph{Forward dynamics and the hydrodynamic limit.} Starting from the two-atom law
-$\pm a_0$ at $N=1200$, the finite-$N$ matrix diffusion matches the free Fokker--Planck
-prediction \eqref{eq:ffp} through the support transition below, with $W_1$ error between
-$1.2\times10^{-3}$ and $2.4\times10^{-3}$ (Figure~\ref{fig:spacetime},
-Appendix~\ref{app:movedfigs}). Averaged over realizations at $N=25,\dots,800$, the error
-against the \emph{exact} free marginal decays as $N^{-1}$ (fitted exponents $-0.93$,
-$-0.97$), reflecting GUE rigidity; measured against an equal-size Monte~Carlo sample it
-shows the misleading rate $N^{-1/2}$, the fluctuation of the reference sample
-(Appendix~\ref{app:additional-figures}).
-
-\paragraph{The support transition.}\label{sec:transition-para} For the two-atom law
-$\tfrac12(\delta_{-a}+\delta_a)\boxplus\gamma_v$, a bisection search on the numerically
-computed density locates the gap-closing transition at $v^*=2.5600$ against the
-theoretical $a_0^2=2.56$, and the density at the gap center over the $(a,v)$ plane
-confirms $v^*=a^2$ as an identity in $a$ (Appendix~\ref{app:additional-figures}).
-
-\paragraph{Functional inequalities.} Along the same forward trajectory we verify the free
-log-Sobolev, Talagrand and HWI inequalities of \S\ref{sec:background} as ratios that must
-stay below $1$: the maxima are $0.491$, $0.522$ and $0.678$ (HWI tightest, as it implies
-the other two), and the de~Bruijn identity holds to a median relative error of
-$2.4\times10^{-3}$ over four orders of magnitude in $\Div$ (Figure~\ref{fig:lsi},
-Appendix~\ref{app:movedfigs}).
-
-\paragraph{Gap survival: two independent gaps.} For a three-atom law at
-$-2.3,0.4,1.9$ with weights $0.5,0.2,0.3$, Theorem~\ref{thm:gapclosing} predicts two
-\emph{different} thresholds, $\alpha_1^*=0.287$ and $\alpha_2^*=0.479$, since $T$
-depends on position and mass, not only on gap width. Counting connected components
-of the numerically computed support confirms both, in the predicted order and within
-one grid step of each threshold (Appendix~\ref{app:gapclosing}) -- direct evidence
-that the theory controls not just whether but exactly \emph{when} structure in a
-target spectrum survives partway through the forward corruption, which is precisely
-the information a practitioner needs to choose how much of the schedule to run.
-(This does not cover the vanishing-mass outliers of the spiked model, which follow
-Baik--Ben~Arous--P\'ech\'e-type phenomena \citep{BaikBenArousPeche2005}.)
-
-\paragraph{A real spectral distribution outside the semicircular family.} We use daily
-closing prices of the $N=470$ S\&P~500 constituents with complete coverage from
-2013-02-08 to 2018-02-07 \citep{plotlydatasets}, take standardized log-returns, and form
-the empirical correlation matrix of $N=100$ assets over all $T=1258$ trading days
-($L=N/T=0.080$; selection and preprocessing in Appendix~\ref{app:realdata}). As is
-familiar for financial correlations \citep{Laloux1999,Plerou2002,Bun2017}, the spectrum
-is only loosely Marchenko--Pastur-like -- the $95$ smallest eigenvalues span $[0.12,1.68]$
-against a predicted support $[0.52,1.64]$, and only $47\%$ lie inside it -- and $5$
-eigenvalues sit clearly above the predicted edge, the largest carrying $32\%$ of the
-total variance (the market mode). No constant-coefficient free diffusion can represent
-this: its only equilibrium is semicircular, which even at the best-fitting mean and
-variance misses the real spectrum by $W_1=2.20$ (Figure~\ref{fig:realdata}).
-Theorem~\ref{thm:design} applies not to the raw eigenvalues but to a regularized density
-estimate $\hat\mu_*$, a truncated, renormalized kernel density estimate of the eigenvalues
-(Appendix~\ref{app:realdata}): $b_*=-H\hat\mu_*$ makes $\hat\mu_*$, not the raw empirical
-measure, a stationary spectral law (Level~I). Simulating the designed diffusion from a
-mismatched start reproduces the bulk of the target (Wasserstein distance $0.07$ over the
-central quantiles) but does not reach the two isolated outliers within the run: the largest
-simulated eigenvalue is $3.0$, against $4.9$ and $32.0$ in the data (Appendix~\ref{app:realdata}).
-This experiment shows that real spectra can lie far outside the constant-coefficient
-equilibrium family; it is not a demonstrated generative application.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.85\linewidth]{fig_realdata.png}
-\caption{Real S\&P~500 correlation spectrum ($N=100$, $T=1258$) against the
-Marchenko--Pastur bulk prediction and the best-fitting semicircular law -- the only
-shape a constant-coefficient free diffusion can produce.}
-\label{fig:realdata}
-\end{figure}
-
-\paragraph{Free versus coordinatewise corruption.} We corrupt a two-atom spectrum
-($\pm1.6$) with Hermitian Gaussian noise of variance $v$ at $N=2500$ and compare the
-empirical spectrum against both predictions.
+\paragraph{Free versus coordinatewise corruption.} We corrupt a two-atom spectrum ($\pm1.6$)
+with Hermitian Gaussian noise of variance $v$ at $N=2500$ and compare the empirical spectrum with
+both predictions.
 
 \begin{table}[h]
 \centering
-\caption{$W_1$ distance to the empirical spectrum. Free tracks the finite-$N$
-fluctuation; coordinatewise is off by two orders of magnitude.}
+\caption{$W_1$ distance to the empirical spectrum. The free prediction agrees with it up to
+finite-$N$ fluctuations; the coordinatewise prediction is off by about two orders of magnitude.}
 \label{tab:freevsclassical}
 \begin{tabular}{lccc}
 \toprule
@@ -583,146 +500,163 @@ coordinatewise ($*$) & 0.109 & 0.219 & 0.275 \\
 \end{tabular}
 \end{table}
 
-\paragraph{One score for every dimension.} The free score is a scalar function of the
-eigenvalue and the noise level, so the same function can drive the reverse-time matrix
-SDE at any $N$. To test this in isolation from estimation error we use the \emph{exact}
-free score of the two-atom law, computed once from its closed-form density, at
-$N=50,200,600$: the reconstruction error is $W_1=0.028,\,0.017,\,0.0084$ (fitted
-exponent $-0.48$, consistent with the $O(N^{-1/2})$ accumulation of Euler--Maruyama
-noise; Figure~\ref{fig:transfer}). This does not yet test a \emph{learned} score across
-sizes: the learned score below is evaluated at a single $N$. An entrywise score, by
-contrast, is an $N^2$-dimensional object tied to its training size.
+\paragraph{Forward flow and gap closing.}\label{sec:transition-para} The matrix diffusion matches the
+free Fokker--Planck prediction \eqref{eq:ffp} through the support transition ($W_1$ error
+$1.2$--$2.4\times10^{-3}$ at $N=1200$; the gap closes at $v^*=2.5600$ against $a_0^2=2.56$), and a
+three-atom law loses its two gaps at the predicted thresholds $\alpha_1^*=0.287$ and $\alpha_2^*=0.479$
+(Theorem~\ref{thm:gapclosing}). Further checks are in Appendices~\ref{app:further} and~\ref{app:gapclosing}.
+
+\paragraph{A designed equilibrium: Marchenko--Pastur.} We integrate the Hermitian matrix diffusion of
+Example~\ref{ex:mp} at $N=400$, $L=\tfrac12$, from a spectrum far from the target. The drift is applied
+spectrally, so that the repulsion between eigenvalues comes from the noise and is not formed
+explicitly; the eigenvalue system itself is stiff near the origin (Appendix~\ref{app:experiments}). The
+empirical spectrum converges to Marchenko--Pastur (terminal $W_1=3.5\times10^{-3}$ at $T=8$). On the
+quadrature grid, the identity $V'=2H\mu_*$ holds to relative error $9.4\times10^{-4}$ in the
+interior, and the fitted edge exponents are $0.43$ and $0.51$ against $1/2$, which confirms the
+Hölder vanishing at the edges that makes $b_*$ bounded on $K$.
+
+\paragraph{State-dependent volatility at fixed equilibrium.} Marchenko--Pastur does not need a state-dependent volatility, since $f\equiv1$ already reaches it. We use it to compare the classes of
+Table~\ref{tab:classes} from the same far start ($N=150$, $T=6$; Figure~\ref{fig:volatility}). Free OU (a)
+goes to the semicircle and ends at $W_1=0.94$ from the target. Langevin dynamics on independent
+eigenvalues with the same potential would equilibrate to the Gamma$(2,2)$ law, at $W_1=0.092$. The
+designed flows reach $W_1\approx0.007$, the finite-$N$ floor, and stay there from $\mu_*$. With $f^2\equiv2$ the flow is $4.2$ times faster than with $f\equiv1$, as the
+clock-change identity ($c^4=4$) predicts. For $f^2(x)=\tfrac12+\tfrac{3x}{2(1+x)}$ it is $1.44$ times
+faster, but this is not a clock change: under a clock change the ratio of the arrival times of the
+lower and upper spectral edges is unchanged ($0.16$ for $f\equiv1$ and $0.18$ for $f^2\equiv2$), while
+here it is $0.54$ (Figure~\ref{fig:volatility}, right). The equilibrium is the same by construction.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.85\textwidth]{fig6_dimension_transfer.png}
-\caption{Reverse-time matrix dynamics driven by the exact free score of the two-atom
-law at $N=50,200,600$ against the target density, and $W_1$ error against $N$.}
-\label{fig:transfer}
+\includegraphics[width=0.9\textwidth]{fig15_volatility.png}
+\caption{The model classes of Table~\ref{tab:classes} on the Marchenko--Pastur target ($N=150$). Left: $W_1$ to the
+target from a flat-band start. Middle: designed drifts with and without state-dependent volatility, which have the same
+equilibrium. Right: edge progress (solid: upper edge, dashed: lower edge); for $f^2\equiv2$, plotted against the rescaled time
+$c^4t$, it falls on the curve for $f\equiv1$, and for non-constant $f$ it does not.}
+\label{fig:volatility}
 \end{figure}
 
-\paragraph{A designed equilibrium: Marchenko--Pastur.} We integrate the Hermitian
-matrix diffusion of Example~\ref{ex:mp} at $N=400$, $L=\tfrac12$, from an initial
-spectrum far from the target. The eigenvalue system itself is stiff near the origin
-(the Dyson repulsion grows like the reciprocal gap while $V'$ diverges there), so we
-integrate the Hermitian matrix model instead, applying $V'$ spectrally at each step so
-repulsion is generated implicitly by the matrix noise (Theorem~\ref{thm:opvol}) rather
-than formed explicitly, stable at a step size where the direct eigenvalue integration
-is not (Appendix~\ref{app:experiments}). The
-empirical spectrum converges to Marchenko--Pastur (terminal $W_1=3.5\times10^{-3}$
-at $T=8$). Two further checks, evaluated for the Marchenko--Pastur density on a
-quadrature grid, bear directly on the hypotheses of Theorem~\ref{thm:design}: the
-stationarity identity $V'=2H\mu_*$ holds to relative error $9.4\times10^{-4}$ on the
-interior of the support, and the fitted edge exponents are $0.43$ and $0.51$ against
-the theoretical $1/2$, confirming the H\"older edge-vanishing that makes $b_*$ bounded
-on all of $K$.
+\paragraph{Reversing a designed flow.} Take Marchenko--Pastur ($L=\tfrac12$) as the prior and, as data, the
+spectrum of $\mathrm{diag}(0.7,2.1)+\sqrt{0.03}\,\mathrm{GUE}$, two separated clusters. We run the designed flow
+forward from the data law as a noise-free system of $M=800$ equal-mass particles, the $N\to\infty$ limit of the
+eigenvalue dynamics without the Brownian part, which gives $\mu_t$ at every $t$. A fresh sample of $N=400$ eigenvalues of
+the prior is then moved back to $t=0$ by non-interacting particles with velocity $-V_{T-s}$, where $V_t=b+f^2H(f^2\mu_t)$
+is the velocity of Theorem~\ref{thm:opvol}; this carries $\mu_T$ to $\mu_0$ where the characteristics are well defined
+(Appendix~\ref{app:further}). The velocity comes from the forward solution, as the exact score does for the free OU flow, and
+the reversal is deterministic. Over five independent prior samples the generated spectra are at $W_1=0.0052\pm0.0011$
+($f\equiv1$) and $0.0063\pm0.0022$ (non-constant $f$) from a data sample, against $0.43$ for the prior and $0.0015$ for two
+independent data samples. In the first run $199$ and $198$ of the $400$ eigenvalues end in the left cluster instead of $200$, and one
+stays in the gap (Figure~\ref{fig:designedreverse}).
 
-\paragraph{Generative modeling with a learned score.} We instantiate
-Algorithm~\ref{alg:main} end to end on a spiked-covariance spectrum at $N=400$,
-comparing three scores driving the same sampler.
+\paragraph{Targets of increasing complexity.} We run the designed flow with $f\equiv1$ as a noise-free particle system, from a narrow flat
+band, to Marchenko--Pastur, a symmetric and an asymmetric ($0.3/0.7$) two-cut law, a three-cut law, and Marchenko--Pastur with two isolated bumps
+(Figure~\ref{fig:targets}). Each target is stationary when the flow starts from it ($W_1\le0.005$), as Theorem~\ref{thm:design} states.
+Marchenko--Pastur is reached by $t=8$ ($W_1=0.001$). The targets with gaps are approached slowly, with particles left in the gaps: $W_1$ falls
+from $0.045$--$0.181$ at $t=8$ to $0.011$--$0.066$ at $t=40$ and is still decreasing, and the cluster masses move toward the target (asymmetric
+law, $0.3/0.7$: $0.332/0.668$ at $t=8$, $0.318/0.682$ at $t=40$). The flow has no noise; a matrix flow may clear the gaps differently
+(Appendix~\ref{app:further}).
+
+\paragraph{Learned score on a spiked spectrum.} \paragraph{Learned score on a spiked spectrum.} We train a denoiser as in Algorithm~\ref{alg:main} on a
+spiked-covariance spectrum at $N=400$ and compare three scores in the same sampler
+(one realization). The learned score is close to the oracle ($0.073$ against
+$0.062$), and the coordinatewise score is about twice as far ($0.121$), so the error of the coordinatewise
+model shows in generated samples and not only in the forward corruption (Figure~\ref{fig:generative},
+Appendix~\ref{app:further}). The gap between the learned and exact scores is of the order of the spread across
+noise draws in Table~\ref{tab:crossn} at $N=200$ and $400$ (standard deviations $0.001$ to $0.008$), so we do not
+read it as a difference in quality. An exact-score reconstruction of the spiked spectrum is in
+Figure~\ref{fig:spiked}.
+
+\paragraph{One score across matrix sizes.} With the exact two-atom score the reverse sampler reaches $W_1=0.028$, $0.017$ and $0.0084$
+at $N=50,200,600$ (exponent $-0.48$; Figure~\ref{fig:transfer}). Table~\ref{tab:crossn} tests a learned score, trained by free denoising score matching at
+$N_{\rm train}=100$ or $400$ and used without retraining at $N=50,\dots,800$, on atomic laws whose target is the same at every size. The exact score
+needs a caution: in $16$ of $47$ runs with it, one eigenvalue ends more than a unit outside the support, because an eigenvalue lagging the moving edge is
+pushed outward by the reverse drift and the exact score outside the support is too weak to restore it. Neither learned network does this ($0$ of $47$).
+A stray eigenvalue adds about its distance over $N$ to $W_1$ but at most $1/N$ to the KS distance, so we also report KS (Appendix~\ref{app:further}).
+On the two-atom law the score trained at $N=400$ is within $0$ to $25\%$ of the exact score in KS at $N=100$ to $800$. The score trained at $N=100$ is
+$1.1$ to $2.0$ times worse, does not improve with $N$, and for $N\ge200$ has a bias in the mean of about $0.05$; its score error is about three times larger
+(RMS $0.023$ to $0.031$ against $0.008$ to $0.015$), amplified by the factor $1/v$ in $\widehat\xi$. On the three-atom law both are close to the exact score.
+A score can thus be used at other sizes, but its accuracy is set by the finite-$N$ noise in the training labels at the size where it was trained.
 
 \begin{table}[h]
 \centering
-\caption{$W_1$(generated, data), same reverse-time sampler, three scores.}
-\label{tab:generative}
-\begin{tabular}{lccc}
+\caption{$W_1$ to the exact free marginal at the stopping time, two-atom law (three-atom law and other metrics: Appendix~\ref{app:further}). ``learned@$N_0$'': trained at $N=N_0$. Means over 8, 8, 4, 3 noise draws at $N=50,100,200,400$, one at $N=800$; exact-score values include the strays described in the text.}
+\label{tab:crossn}
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-score & learned & oracle & coordinatewise \\
+score & 50 & 100 & 200 & 400 & 800\\
 \midrule
-$W_1$ & 0.073 & 0.062 & 0.121 \\
+exact score & .045 & .024 & .013 & .011 & .008\\
+learned@100 & .075 & .036 & .049 & .047 & .047\\
+learned@400 & .035 & .023 & .009 & .009 & .009\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The learned score is close to the oracle ($0.073$ versus $0.062$), as the consistency of
-\eqref{eq:loss} suggests up to finite-sample estimation error, and the coordinatewise
-score is roughly twice as bad, so the misspecification of \S\ref{sec:naive} is visible in
-generated samples, not only in the forward corruption. See Figure~\ref{fig:generative}. A further
-exact-score check, reconstructing a spiked covariance spectrum (bulk plus three
-outliers), is in Figure~\ref{fig:spiked} (Appendix~\ref{app:movedfigs}).
+\paragraph{A real spectrum outside the semicircular family (stress test).} The empirical correlation matrix of
+$N=100$ S\&P~500 assets over $T=1258$ days (2013--2018; \citealp{plotlydatasets}; Appendix~\ref{app:realdata}) is only
+loosely Marchenko--Pastur-like \citep{Laloux1999,Plerou2002,Bun2017}: $47\%$ of its $95$ smallest eigenvalues lie inside the
+predicted support and $5$ lie above its edge. The best-fitting semicircle misses it by $W_1=2.20$ (Figure~\ref{fig:realdata},
+Appendix~\ref{app:further}). This tests expressivity and not generation: $b_*=-H\hat\mu_*$ makes a regularized density estimate
+$\hat\mu_*$ stationary (property~I), and the simulated flow reproduces the bulk ($W_1=0.07$ over the central quantiles) but not the
+isolated outliers.
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.85\linewidth]{fig9_generative.png}
-\caption{Left: learned, exact, and coordinatewise scores at $\alpha_t=0.45$. Right:
-spectra generated by each, against the data spectrum.}
-\label{fig:generative}
-\end{figure}
-
+% ======================================================================
 \section{Related work}\label{sec:related}
 % ======================================================================
 
-This paper bridges two literatures developed largely independently: diffusion models,
-built for vector-valued data, and free probability, which has not been systematically
-developed as a framework for score-based generative modeling.
+Our work connects score-based diffusion modeling with free probability by treating the spectral law, rather
+than the entries of the matrix, as the generative object.
 
-\textbf{Diffusion models.} \citet{SohlDickstein2015,Ho2020,Song2021} establish the
-score-based/SDE framework this paper extends; \citet{Anderson1982,Haussmann1986} give
-the classical time-reversal theory it specializes; \citet{Vincent2011,Hyvarinen2005}
-are the classical denoising/score-matching results our free Tweedie identity
-generalizes. Diffusion on manifolds \citep{DeBortoli2022,Huang2022} models the data
-manifold itself; we model the spectral law.
+\textbf{Diffusion models.} \citet{SohlDickstein2015,Ho2020,Song2021} establish the score-based/SDE
+framework we extend; \citet{Anderson1982,Haussmann1986} give the time reversal it specializes;
+\citet{Vincent2011,Hyvarinen2005} are the denoising/score-matching results our free Tweedie
+identity generalizes. Diffusion on manifolds \citep{DeBortoli2022,Huang2022} models the data
+manifold; we model the spectral law.
 
-\textbf{Free probability.} Free stochastic calculus is due to
-\citet{BianeSpeicher1998,Biane1997,Biane1998}; free entropy and free Fisher
-information to \citet{Voiculescu1993,Voiculescu1998}; the free transport metric to
-\citet{BianeVoiculescu2001}; free functional inequalities to
-\citet{Biane2003,HiaiPetzUeda2004,LedouxPopescu2009}, which our convex-potential
-corollary specializes to; time reversal of free diffusions to \citet{Dabrowski2014};
-well-posedness of operator-valued free SDEs to \citet{BianeSpeicher1998,WeiYin2026}.
-Random matrix dynamics go back to \citet{Dyson1962,RogersShi1993,Bru1989}.
+\textbf{Free probability.} Free stochastic calculus: \citet{BianeSpeicher1998,Biane1997,Biane1998};
+free entropy and Fisher information: \citet{Voiculescu1993,Voiculescu1998}; the free transport
+metric: \citet{BianeVoiculescu2001}; free functional inequalities:
+\citet{Biane2003,HiaiPetzUeda2004,LedouxPopescu2009}; time reversal: \citet{Dabrowski2014};
+well-posedness of free SDEs: \citet{BianeSpeicher1998,WeiYin2026}. Random matrix dynamics:
+\citet{Dyson1962,RogersShi1993,Bru1989}.
 
-\textbf{Random matrices in statistics and machine learning.} Sample-covariance spectra
-underlie covariance cleaning \citep{LedoitWolf2012,Bun2017} and the random-matrix
-analysis of financial correlations \citep{Laloux1999,Plerou2002}; free probability has
-been used to analyze deep-network Jacobian spectra \citep{Pennington2018}. These works
-estimate or analyze spectra; we generate them.
+\textbf{Random matrices in statistics and machine learning.} Sample-covariance spectra underlie
+covariance cleaning \citep{LedoitWolf2012,Bun2017} and the analysis of financial correlations
+\citep{Laloux1999,Plerou2002}; free probability analyzes deep-network Jacobian spectra
+\citep{Pennington2018}. These works estimate or analyze spectra; we generate them.
 
 % ======================================================================
-\section{Limitations}\label{sec:limitations}
+\section{Discussion and limitations}\label{sec:limitations}
 % ======================================================================
 
-Theorem~\ref{thm:design} is a Level~I statement: stationarity of the continuity
-equation, not well-posedness of the SDE (Level~III), which for a general (unbounded,
-non-globally-Lipschitz) drift needs the dissipativity theory of \citet{WeiYin2026}; we do
-not carry this out. For Marchenko--Pastur, where $V'$ is singular at $x=0$
-(Example~\ref{ex:mp}): the free limiting PDE and its stationary law are proved; the
-finite-$N$ realization is numerically validated (\S\ref{sec:experiments}); global
-well-posedness of the singular finite-$N$ SDE is not established; reverse-time generation
-is demonstrated numerically, not proved. The learned score is evaluated at a single
-matrix size, and each sampling step costs $O(N^3)$ (\S\ref{sec:algorithm}). The theory is
-for a single self-adjoint variable; the multivariate case is open, since the free
-transport metric coincides with the classical one on $\R$ only in one variable
-\citep{BianeVoiculescu2001}. The model generates spectral laws, not eigenvector
-structure (\S\ref{sec:intro}). Further caveats (edge regularity, hard-edge uniqueness)
-are in Appendix~\ref{app:limitations}.
+\paragraph{Limitations.} For the designed flows in general only stationarity (I) is proved. Relaxation (II) is proved for $f\equiv1$
+and strictly convex $V$ and observed for non-constant $f$. Well-posedness (III) of the SDE with the designed drift, which is unbounded
+near the support edges and singular at $0$ for Marchenko--Pastur, is not established and would need the theory of \citet{WeiYin2026}.
+For (IV) we reverse a designed flow with the exact velocity from the forward solution and a deterministic reversal. We have neither a
+reverse-time SDE for non-constant $f$ nor a learned velocity: the marginals of a designed flow are not free convolutions, so the free
+Tweedie identity does not apply to them. Stationarity does not imply reachability: the S\&P outliers are not reached, and the targets with gaps are approached slowly. With Euler--Maruyama steps the exact score is not a clean reference, because it sometimes leaves an eigenvalue outside the support (\S\ref{sec:experiments}). The learned score does not
+depend on $N$ in its parameterization but its cost per step is $O(N^3)$ and its accuracy depends on the training size; $N=800$ uses one
+noise draw. The theory is for a single self-adjoint variable \citep{BianeVoiculescu2001}. Further caveats are in Appendix~\ref{app:limitations}.
 
 % ======================================================================
 \section{Conclusion}\label{sec:conclusion}
 % ======================================================================
 
-For unitarily invariant spectral data, coordinatewise Gaussian corruption produces the
-classical limit rather than the free-convolution limit that governs the actual corruption
-process, and the free forward process corrects this but admits a single equilibrium
-shape. State-dependent free volatility removes that restriction: for any sufficiently
-regular target it gives an explicit drift with that target as a stationary spectral law
-(Theorem~\ref{thm:design}), and for strictly convex potentials a relaxing, reversible,
-trainable model (Corollary~\ref{cor:designconvex}). Two structural results show this is
-not a relabeling of the constant-coefficient theory (Theorems~\ref{thm:lamperti}
-and~\ref{thm:nogradient}), and a third quantifies how target structure survives partway
-through the forward process (Theorem~\ref{thm:gapclosing}).
+Coordinatewise corruption of eigenvalues gives the classical limit, whereas the corruption of a Hermitian matrix follows the free limit, whose
+natural forward process, the free OU flow, has only the semicircle as its equilibrium. A nonlinear drift reaches other equilibria when the potential is
+strictly convex, and a state-dependent volatility is compatible with a prescribed stationary law (Theorem~\ref{thm:design}); the resulting flows are not related
+to constant-volatility ones by a change of variable (Theorems~\ref{thm:lamperti} and~\ref{thm:nogradient}) and, in simulation, differ in the transient. The
+free Tweedie identity reduces score estimation to scalar regression, and a learned score transfers across matrix sizes with an accuracy that depends strongly
+on the training size. The open points are well-posedness of the designed drifts, a reverse-time SDE and a learned velocity for designed flows, any gain in a
+generative metric from a non-constant $f$, and more than one self-adjoint variable. The S\&P outliers and the slow approach to targets with gaps show that
+stationarity does not imply reachability.\label{end:maintext}
 
-The real-data experiment of \S\ref{sec:experiments} is an illustrative validation, not a
-demonstrated financial application: a real correlation spectrum can lie far outside the
-equilibrium family of constant-coefficient free diffusion, as financial correlation
-spectra are known to \citep{Laloux1999,Plerou2002}. Natural next steps are a learned-score
-evaluation across matrix sizes and targets, and closing the stationarity--reachability
-gap for isolated-outlier targets (Appendix~\ref{app:realdata}).\label{end:maintext}
-
-\paragraph{AI Use Statement.} Generative AI tools were used in drafting and revising
-this manuscript's text, in verifying algebraic and analytic steps in the proofs, and
-in preparing numerical experiments and figures. All mathematical claims were checked
-independently and the authors take full responsibility for all content.
+\section*{AI Use Statement}
+We used a generative AI assistant (Anthropic's Claude) mainly to polish the language and the structure of the paper and to
+help write parts of the code, and, to a lesser extent, to help check derivations and to suggest and run numerical
+experiments. We have reviewed all AI-assisted work and take responsibility for the final content of this work, including
+text, claims, and artifacts produced with the aid of generative AI.
 
 \begin{singlespace}
 \begin{thebibliography}{99}
@@ -976,13 +910,8 @@ preprint, arXiv:2606.31528 (2026).
 
 \section*{Appendix}
 
-\noindent This appendix is organized to be read independently of the main text where
-possible, and is referenced from it at every point where a full proof, a fuller
-derivation, or additional experimental or figural detail was deferred. Every proof
-sketched in the main text (Theorems~\ref{thm:opvol}, \ref{thm:design},
-\ref{thm:lamperti}, \ref{thm:nogradient}, \ref{thm:gapclosing}; the free Tweedie
-identity and Theorem~\ref{thm:consistency}) is given here in full, with every
-intermediate step justified rather than asserted. The sections are:
+\noindent This appendix contains the proofs of the results stated in the main text and further
+experimental material. Its sections are:
 \begin{itemize}[leftmargin=1.4em,itemsep=0pt,topsep=2pt]
 \item[A] Free It\^o calculus, self-adjointness, and the full proof of
   Theorem~\ref{thm:opvol}.
@@ -1003,12 +932,11 @@ intermediate step justified rather than asserted. The sections are:
 \item[I] Why a DiPerna--Lions-type theory is not needed for the forward flow's
   uniqueness, and exactly where that guarantee stops.
 \item[J] A precise comparison of the two derivations of the reverse-time SDE.
-\item[K] Figures referenced from \S\ref{sec:experiments} but not reproduced there for
-  space.
+\item[K] Additional figures for \S\ref{sec:experiments}.
 \item[L] Full methodology for the real-data (S\&P~500) experiment.
 \item[M] Limitations and further directions, in more detail than \S8.
-\item[N] Three figures from the experiments of \S\ref{sec:experiments}
-  (forward dynamics, functional inequalities, spiked reconstruction), placed here for space.
+\item[N] Further experimental material: figures and tables, the clock-change identity, and details of the
+  volatility, designed-flow reversal, learned-score and cross-size experiments.
 \end{itemize}
 \bigskip
 
@@ -1195,7 +1123,9 @@ $g'(x)f(x)^2=\sigma$ with $g'$ constant makes $f$ constant.
 \end{proof}
 
 \begin{proof}[Proof of Theorem~\ref{thm:nogradient}]
-Write $\delta E/\delta\mu(x)=W(x)+\int K(x,y)\dd\mu(y)$; matching interaction parts of
+The $m$-mobility Wasserstein gradient flow of $E(\mu)=\int W\dd\mu+\tfrac12\iint K\,\dd\mu\dd\mu$, with $K$ symmetric, is
+$\partial_t\mu=\partial_x(m\mu\,\partial_x\delta E/\delta\mu)$, so its velocity is $-m\,\partial_x\delta E/\delta\mu$ with
+$\delta E/\delta\mu(x)=W(x)+\int K(x,y)\dd\mu(y)$. Matching the interaction parts of
 the two velocity fields for every $\mu$ determines $\partial_xK$ up to a one-body term
 absorbed into $W'$, so we normalize $\partial_xK(x,y)=-a(x)q(y)/(x-y)$ with $a=f^2/m$,
 $q=f^2$. Symmetry of $K$ requires $\partial_y\partial_xK=\partial_x\partial_yK$, i.e.
@@ -1210,7 +1140,8 @@ $F:=q^2=f^4$ gives $F(x)-F(y)=\tfrac12(x-y)[F'(x)+F'(y)]$; differentiating in $x
 $y$ gives $F''(y)=F''(x)$ for all $x\ne y$, so $F$ is a quadratic polynomial,
 necessarily positive since $F=f^4$: the first half of \eqref{eq:gradflowclass}.
 Sufficiency is a direct computation. Finally $\kappa=\lambda=0$ in
-\eqref{eq:gradflowclass} makes $f$ constant and conversely.
+\eqref{eq:gradflowclass} makes $f$ constant and conversely. The argument uses only $x\neq y$ in the domain of $f$: for $f$ defined on all of $\R$ it gives the
+stated conclusion, and for $f$ defined on a bounded interval $K$ it gives $f^4$ quadratic on $K$.
 \end{proof}
 
 \begin{remark}[The exceptional family is non-empty]
@@ -1526,7 +1457,7 @@ $\Theta_{\mu_0}(0)=a_0^{-2}$ is the minimum over $(-a_0,a_0)$ by convexity, so
 $T=a_0^{-2}$ and the threshold reduces to $\alpha_t>1/(1+a_0^2)$, recovering the
 two-atom support transition used as a running example in \S\ref{sec:experiments}.
 The hypothesis requires mass on both sides of the gap, which is why the theorem does
-not cover the vanishing-mass spikes of Figure~\ref{fig:spiked} (Appendix~\ref{app:movedfigs}).
+not cover the vanishing-mass spikes of Figure~\ref{fig:spiked} (Appendix~\ref{app:further}).
 
 \paragraph{Numerical validation: two independent gaps.} Take $\mu_0$ with three
 atoms at $-2.3,0.4,1.9$, weights $0.5,0.2,0.3$. Direct computation gives
@@ -1548,7 +1479,7 @@ Uniqueness of the forward flow (\S\ref{sec:background}, referenced from
 Theorem~\ref{thm:design}'s proof) is proved within the class of Cauchy transforms of
 probability measures -- equivalently, classical solutions of the complex Burgers
 equation on $\mathbb C^+$ -- rather than in a wider measure-valued or distributional
-class. This is not a restriction of convenience: Biane's regularity theorem (main
+class. The restriction is not arbitrary: Biane's regularity theorem (main
 text) shows every measure of the form $\rho\boxplus\gamma_v$, $v>0$, already lies in
 this class with a bounded, real-analytic density, so for $t\ge\varepsilon>0$ the
 forward flow is automatically as regular as the class allows, whatever the
@@ -1576,8 +1507,8 @@ The reverse-time SDE \eqref{eq:reversesde} can be derived two ways: directly, by
 reversing the limiting free flow (specializing \citet{Dabrowski2014}, as done in the
 main text), or via classical Haussmann--Pardoux reversal of the finite-$N$ eigenvalue
 process followed by $N\to\infty$. These establish statements about \emph{different
-objects}, not two proofs of the same statement, and it is worth being precise about
-how they relate, since it is tempting to describe them as agreeing pathwise.
+objects}, not two proofs of the same statement, and they should not be described
+as agreeing pathwise; we state how they relate.
 
 \textbf{Assumptions.} The direct route needs $\beta$ measurable and bounded on
 $[0,T]$ (so $\alpha_t<1$ for $t>0$ and Biane's regularity theorem applies) and
@@ -1665,7 +1596,7 @@ compact-support hypothesis of Theorem~\ref{thm:design}: precisely the failure mo
 the Cauchy-law example of Appendix~\ref{app:design}'s necessity-of-hypotheses
 discussion. We instead truncate the KDE
 (bandwidth $0.22$) to $[\min(\mathrm{eigs})-0.3,\max(\mathrm{eigs})+0.3]$ and
-renormalize, giving a genuine compactly supported density $\hat\mu_*$, then compute
+renormalize, giving a compactly supported density $\hat\mu_*$, then compute
 $b_*=-H\hat\mu_*$ on this interval by direct numerical principal-value integration.
 For simulation (not for the stationarity claim itself, which only concerns the
 interior of the support) we extend $b_*$ linearly outside the fitted interval with
@@ -1674,7 +1605,7 @@ keeps simulated eigenvalues that fluctuate outside the data-supported range from
 escaping instead of returning, exactly as the Marchenko--Pastur experiment
 (\S\ref{sec:experiments}) needed a floor near $x=0$ for the same reason.
 
-\paragraph{Dynamical relaxation: what we found, and its limits.} Starting a $N=100$
+\paragraph{Dynamical relaxation.} Starting a $N=100$
 Hermitian matrix diffusion from an independent Wishart-type spectrum (mismatched in both
 shape and scale to the target) and integrating with this drift for $8000$ steps at
 $\dd t=5\times10^{-4}$ (seed $7$), applying $b_*$ spectrally at each step as in
@@ -1684,7 +1615,7 @@ $[0.02,0.98]$ is $0.069$. It does not reproduce the two isolated outliers: the l
 simulated eigenvalue is $3.03$, whereas the real spectrum has eigenvalues at $4.93$ and,
 for the market mode, $32.02$. This does not contradict the stationarity claim --
 $\hat\mu_*$, outliers included, is a fixed point of the continuity equation by construction
-(Level~I) -- but it shows that the finite-$N$ sampler does not reach that fixed point from
+(property~I) -- but it shows that the finite-$N$ sampler does not reach that fixed point from
 this start within this budget. We do not know whether longer runs would: an eigenvalue far
 outside the bulk is a rare configuration of the designed equilibrium, and the drift pulls
 a single eigenvalue back toward the bulk, so these outliers may be metastable rather than
@@ -1697,7 +1628,7 @@ possible) misses the true spectrum at $W_1=2.20$, an order of magnitude worse th
 any of the synthetic-data $W_1$ values reported in \S\ref{sec:experiments}, and this
 mismatch cannot be improved by more training, more data, or a better-tuned schedule:
 it is forced by the explicit forward solution of \S\ref{sec:background}, i.e.\ by the
-fact that a constant-coefficient free diffusion has no equilibrium other than
+fact that a free OU flow has no equilibrium other than
 semicircular. This
 is the concrete, real-data version of the restriction Theorem~\ref{thm:design}
 removes.
@@ -1729,7 +1660,7 @@ Theorem~\ref{thm:design} exists for several noncommuting variables is open.
 requires the target density to vanish at the edges of its support; we do not know an
 example where uniqueness fails at a hard edge, only that the proof does not cover it.
 
-\section{Figures moved from the experiments section}\label{app:movedfigs}
+\section{Further experimental material}\label{app:further}
 
 \begin{figure}[h]
 \centering
@@ -1755,6 +1686,239 @@ identity $-\dd\Div/\dd\Lambda=\tfrac12\relF$.}
 \caption{Reverse-time free flow reconstructing a spiked covariance spectrum from the
 semicircular law, exact score. Bulk and the three outliers are both recovered.}
 \label{fig:spiked}
+\end{figure}
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{fig_realdata.png}
+\caption{Real S\&P~500 correlation spectrum ($N=100$, $T=1258$) against the
+Marchenko--Pastur bulk prediction and the best-fitting semicircular law, the only shape a
+free OU flow can produce.}
+\label{fig:realdata}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\linewidth]{fig6_dimension_transfer.png}
+\caption{Reverse-time matrix dynamics driven by the exact free score of the two-atom law at
+$N=50,200,600$ against the target density, and $W_1$ error against $N$.}
+\label{fig:transfer}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\linewidth]{fig16_cross_n.png}
+\caption{Cross-size transfer of a learned score (Table~\ref{tab:crossn}). Rings mark a score
+tested at its own training size. $W_1$ is to the exact free marginal at the stopping time.}
+\label{fig:crossn}
+\end{figure}
+
+\paragraph{Clock-change identity.} \begin{proposition}\label{prop:clock}
+Let $f\equiv c>0$ and $b_*=-c^4H\mu_*$, which is $-f^2H(f^2\mu_*)$. The spectral
+velocity of \eqref{eq:opsde} is $V_t=c^4\,(H\mu_t-H\mu_*)$. Hence $\mu_t:=\nu_{c^4t}$ solves
+the continuity equation of Theorem~\ref{thm:opvol} whenever $\nu$ solves it for $f\equiv1$,
+$b=-H\mu_*$, started from the same law; the two flows coincide when the solution is unique
+(for instance in the gradient-flow regime of Corollary~\ref{cor:designconvex}).
+\end{proposition}
+\begin{proof}
+By Theorem~\ref{thm:opvol}, $V_t=-c^4H\mu_*+c^2H(c^2\mu_t)=c^4(H\mu_t-H\mu_*)$, since $H$ is
+linear. If $\partial_s\nu_s+\partial_x(\nu_sW[\nu_s])=0$ with $W[\nu]=H\nu-H\mu_*$, then
+$\mu_t=\nu_{c^4t}$ satisfies $\partial_t\mu_t=c^4(\partial_s\nu)_{c^4t}=-\partial_x(\mu_t\,c^4W[\mu_t])=-\partial_x(\mu_tV_t)$.
+\end{proof}
+So a constant volatility changes no equilibrium and no trajectory in space, only the clock by the
+factor $c^4=(f^2)^2$; in Table~\ref{tab:classes} class (c) is class (b) run faster.
+Consequently the ratio of the times at which any two spectral features arrive is invariant under constant $f$, which is
+the quantity used in the collapse test of Figure~\ref{fig:volatility}. The converse (a non-constant $f$
+changes this ratio) is what the experiment checks; Theorem~\ref{thm:lamperti} is its structural counterpart.
+
+\paragraph{Details of the volatility experiment (\S\ref{sec:experiments}).} Target: Marchenko--Pastur,
+$L=\tfrac12$. All four flows are integrated at the matrix level by Euler steps of
+$\mathrm dX=b(X)\,\mathrm dt+N^{-1/2}f(X)\,\mathrm dH\,f(X)$, with $b$ and $f$ applied spectrally,
+$N=150$, $\mathrm dt=2\times10^{-3}$, $T=6$, from the flat band $\operatorname{diag}(\operatorname{linspace}(0.35,1.9,N))$.
+The drifts are $b=-\tfrac12x$ (a), $-\tfrac12V'$ (b), $-2V'$ (c, $f^2=2$) and
+$-f^2H(f^2\mu_*)$ computed on a $3000$-point grid for $f^2(x)=\tfrac12+\tfrac{3x}{2(1+x)}$ (d);
+eigenvalues are clipped to $[0.02,3.8]$ before $b$ and $f$ are evaluated. Stationarity is tested by
+starting from a quantile discretization of $\mu_*$ ($W_1=0.005$) and running to $t=1.5$. Edge arrival is the first
+time the $5\%$ (lower) or $95\%$ (upper) eigenvalue quantile has covered $80\%$ of the distance from its
+initial value to its Marchenko--Pastur value. Times to $W_1<0.05$: $0.79$ (b), $0.19$ (c), $0.55$ (d). One realization per flow.
+
+\paragraph{Details of the learned-score experiment (\S\ref{sec:experiments}).} The data are the
+eigenvalues of a spiked sample covariance matrix with aspect ratio $2$ and three population spikes $6,4,3$, centred and
+scaled to unit variance, at $N=400$. The denoiser $h_\theta(\lambda,\alpha)$ is a tanh network with two hidden layers of
+width $64$ trained by Adam (learning rate $3\times10^{-3}$, batch $512$) for $240$ epochs on $1.68\times10^5$ pairs with
+$\alpha\in[0.02,0.85]$. Sampling is the reverse matrix SDE with $300$ steps log-spaced in $\alpha$, started from a GUE matrix.
+The oracle score is the exact free score of the empirical spectrum (subordination), and the coordinatewise score is the
+classical Tweedie score of the same empirical mixture applied to each eigenvalue; one realization, one seed.
+
+\paragraph{Forward-flow checks.} From the two-atom law $\pm a_0$ at
+$N=1200$ the matrix diffusion matches the free Fokker--Planck prediction \eqref{eq:ffp}
+through the support transition, with $W_1$ error $1.2$--$2.4\times10^{-3}$; against the
+exact marginal the error decays as $N^{-1}$ (exponents $-0.93$, $-0.97$), while an
+equal-size Monte~Carlo reference gives the misleading $N^{-1/2}$. The gap closes at
+$v^*=2.5600$ against $a_0^2=2.56$, and along the flow the free log-Sobolev, Talagrand and
+HWI ratios stay below $1$ (maxima $0.491$, $0.522$, $0.678$) with the de~Bruijn identity
+holding to $2.4\times10^{-3}$ (Figures~\ref{fig:spacetime} and~\ref{fig:lsi}).
+
+\textbf{Gap survival.} For the three-atom law at $-2.3,0.4,1.9$ with weights
+$0.5,0.2,0.3$, Theorem~\ref{thm:gapclosing} predicts two different thresholds,
+$\alpha_1^*=0.287$ and $\alpha_2^*=0.479$; counting components of the computed support
+confirms both, in order and within one grid step (Appendix~\ref{app:gapclosing}).
+Vanishing-mass spikes are not covered \citep{BaikBenArousPeche2005}.
+
+
+\begin{table}[h]
+\centering
+\caption{$W_1$ to the exact free marginal at the stopping time, both laws; mean (standard deviation) over
+the noise draws, one draw at $N=800$. ``learned@$N_0$'': trained at $N=N_0$. Draws: 8, 8, 4, 3 at $N=50,100,200,400$.}
+\label{tab:crossn-full}
+\footnotesize
+\begin{tabular}{@{}llccccc@{}}
+\toprule
+law & score & 50 & 100 & 200 & 400 & 800\\
+\midrule
+two-atom & exact score & .045 (.022) & .024 (.006) & .013 (.001) & .011 (.001) & .008\\
+ & learned@100 & .075 (.026) & .036 (.016) & .049 (.008) & .047 (.004) & .047\\
+ & learned@400 & .035 (.015) & .023 (.009) & .009 (.001) & .009 (.002) & .009\\
+three-atom & exact score & .059 (.029) & .042 (.012) & .041 (.008) & .038 (.005) & --\\
+ & learned@100 & .050 (.020) & .039 (.010) & .036 (.002) & .038 (.001) & --\\
+ & learned@400 & .055 (.018) & .039 (.009) & .036 (.003) & .037 (.004) & --\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\linewidth]{fig17_designed_reverse.png}
+\caption{Reversing the designed flows (\S\ref{sec:experiments}; one run, $N=400$). Left: the data spectrum, the Marchenko--Pastur
+prior sample, and the spectra generated with $f\equiv1$ and with non-constant $f$. Right: $W_1$ between the particles at reverse time
+$s$ and the forward law $\mu_{T-s}$.}
+\label{fig:designedreverse}
+\end{figure}
+
+\paragraph{Details of the designed-flow reversal.} If $\mu_t$ solves $\partial_t\mu_t+\partial_x(\mu_tV_t)=0$ on $[0,T]$, then
+$\nu_s=\mu_{T-s}$ solves $\partial_s\nu_s+\partial_x(\nu_s(-V_{T-s}))=0$. So when the ordinary differential equation
+$\dot y=-V_{T-s}(y)$ has a unique flow, it carries $\mu_T$ to $\mu_0$. This is a statement about laws; it is not a reverse-time SDE.
+The prior is Marchenko--Pastur with $L=\tfrac12$. The data law is that of $\mathrm{diag}(0.7,2.1)+\sqrt{0.03}\,\mathrm{GUE}$, two clusters of
+equal mass, represented by $M=800$ equal-mass quantile points of its exact density. A random eigenvalue sample is not used for this,
+because its occasional near-coincident pairs make the noise-free system stiff. The forward system is
+$\dot Q_k=b(Q_k)+f^2(Q_k)\,\tfrac1M\sum_{j\ne k}f^2(Q_j)/(Q_k-Q_j)$, integrated to $T=5$ by Heun's method with the step $0.5/\sigma$,
+where $\sigma=\max_k\tfrac1M\sum_{j\ne k}f^2(Q_k)f^2(Q_j)/(Q_k-Q_j)^2$ measures the stiffness of the interaction ($19\,093$ steps for
+$f\equiv1$ and $11\,888$ for non-constant $f$), with $b$ as in the volatility experiment and snapshots every $0.005$. At a snapshot time
+the Hilbert transform $H(f^2\mu_t)$ is evaluated by the particle sum at the midpoints between neighbouring particles, where the two nearest
+singular terms cancel to leading order, and interpolated; outside the support the sum is used directly. A sample of $N=400$ eigenvalues of a
+complex Wishart matrix with aspect ratio $\tfrac12$ is moved by Heun steps of $0.005$ along $\dot y=-V_{T-s}(y)$, $V_t=b+f^2H(f^2\mu_t)$. The
+reference is the spectrum of an independent $400\times400$ matrix drawn from the data law. Five independent prior samples and references
+give the means and standard deviations reported; the forward flow is a single deterministic run. The test suite compares the particle flow
+with the exact free OU marginal, the reversal with the forward particles, and checks that Marchenko--Pastur stays stationary for
+non-constant $f$.
+
+\paragraph{Details of the spectrum metrics.} The runs are those of Table~\ref{tab:crossn}, with the same seeds, so the $W_1$ values reproduce. For each run the generated
+spectrum is compared with the exact free marginal at the stopping time. KS is the Kolmogorov--Smirnov distance; the mean error is $|\text{mean}-\text{exact mean}|$; the
+variance and fourth-moment columns are relative errors of the variance and of the raw fourth moment; the edge error is the larger distance between an extreme generated
+eigenvalue and the corresponding edge of the exact support (density above $0.01$). In a traced exact-score run (three-atom law, $N=200$) the largest eigenvalue was $3.0$ at
+$\alpha\approx0.14$, about $0.4$ beyond the edge of the support, and was pushed outward from there; it ended at $6.7$. The score table extends to $4.9$ and only $55$ evaluations fell
+outside it, so the table range is not what starts the escape.
+
+\begin{table}[h]
+\centering
+\caption{Spectrum metrics at the stopping time against the exact free marginal, for the runs of Table~\ref{tab:crossn}. KS is a mean over the noise draws and the other columns are medians; the edge error is the larger distance of an extreme generated eigenvalue from the edge of the exact support, and strays counts the runs whose edge error exceeds 1.}
+\label{tab:metrics}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}llllccccc@{}}
+\toprule
+law & $N$ & score & KS & $|\Delta\text{mean}|$ & variance & $m_4$ & edge & strays\\
+\midrule
+two-atom & 200 & exact score & 0.0158 & 0.0053 & 0.004 & 0.014 & 0.16 & 1/4\\
+ &  & learned@100 & 0.0251 & 0.0524 & 0.007 & 0.007 & 0.02 & 0/4\\
+ &  & learned@400 & 0.0170 & 0.0024 & 0.006 & 0.017 & 0.01 & 0/4\\
+\addlinespace[2pt]
+ & 400 & exact score & 0.0122 & 0.0045 & 0.011 & 0.049 & 1.06 & 2/3\\
+ &  & learned@100 & 0.0222 & 0.0443 & 0.008 & 0.009 & 0.02 & 0/3\\
+ &  & learned@400 & 0.0152 & 0.0037 & 0.006 & 0.016 & 0.01 & 0/3\\
+\addlinespace[2pt]
+ & 800 & exact score & 0.0099 & 0.0007 & 0.001 & 0.006 & 0.20 & 0/1\\
+ &  & learned@100 & 0.0200 & 0.0473 & 0.009 & 0.010 & 0.02 & 0/1\\
+ &  & learned@400 & 0.0124 & 0.0073 & 0.006 & 0.015 & 0.01 & 0/1\\
+\midrule
+three-atom & 200 & exact score & 0.0210 & 0.0460 & 0.050 & 0.334 & 3.16 & 4/4\\
+ &  & learned@100 & 0.0197 & 0.0262 & 0.013 & 0.015 & 0.01 & 0/4\\
+ &  & learned@400 & 0.0190 & 0.0349 & 0.008 & 0.007 & 0.02 & 0/4\\
+\addlinespace[2pt]
+ & 400 & exact score & 0.0179 & 0.0467 & 0.031 & 0.155 & 3.15 & 3/3\\
+ &  & learned@100 & 0.0148 & 0.0276 & 0.013 & 0.014 & 0.01 & 0/3\\
+ &  & learned@400 & 0.0153 & 0.0388 & 0.009 & 0.004 & 0.01 & 0/3\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Details of the target-complexity experiment.} The targets are Marchenko--Pastur with $L=\tfrac12$; the laws of $\operatorname{diag}(\pm1.6)+\sqrt{0.3}\,\mathrm{GUE}$
+with weights $(\tfrac12,\tfrac12)$ and $(0.3,0.7)$; the law of atoms $-2.3,0.4,1.9$ with weights $(0.5,0.2,0.3)$ plus a semicircle of variance $0.1$; and $0.97$ times Marchenko--Pastur
+plus two semicircular bumps of mass $0.015$, radius $0.15$, centred at $3.6$ and $4.6$. The flow uses $M=400$ equal-mass particles started on a flat band of half the width of the support,
+$b=-H\mu_*$ computed on an $8000$-point grid, the adaptive Heun step of the designed-flow reversal, and snapshots every $0.1$ up to $t=40$. Cut masses are the fractions of particles between the
+midpoints of the gaps. For $\Lambda^*$, $T=\min_u\int\mu_*(\mathrm dy)(u-y)^{-2}$ over each gap.
+
+\begin{table}[h]
+\centering
+\caption{Designed flow ($f\equiv1$, noise-free particles) to targets of increasing complexity. $\Lambda^*$: gap-closing time of Theorem~\ref{thm:gapclosing} for each gap of the target; stationarity: $W_1$ after running from the target to $t=1$; masses: fraction of particles in each cut at $t=40$, and the target masses. MP: Marchenko--Pastur.}
+\label{tab:targets}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccccll@{}}
+\toprule
+target & $\Lambda^*$ & stationarity & $W_1$, $t=8$ & $W_1$, $t=40$ & masses at $t=40$ & target\\
+\midrule
+Marchenko--Pastur & -- & 0.002 & 0.001 & 0.003 & 1 & 1\\
+two cuts, symmetric & 1.11 & 0.003 & 0.045 & 0.011 & .500/.500 & .500/.500\\
+two cuts, 0.3/0.7 & 1.15 & 0.004 & 0.107 & 0.055 & .318/.682 & .300/.700\\
+three cuts & 1.14, 0.63 & 0.003 & 0.170 & 0.059 & .480/.223/.297 & .500/.200/.300\\
+MP + two bumps & 1.08, 1.60 & 0.005 & 0.181 & 0.066 & .945/.020/.035 & .970/.015/.015\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{fig18_target_complexity.png}
+\caption{Designed flow with $f\equiv1$ to five targets (\S\ref{sec:experiments}). Left: $W_1(\mu_t,\mu_*)$. Other panels: the particles at $t=40$ against the target density.}
+\label{fig:targets}
+\end{figure}
+
+\paragraph{Details of the cross-size experiment (\S\ref{sec:experiments}).} The two laws are
+$\tfrac12(\delta_{-1.6}+\delta_{1.6})$ and $0.5\,\delta_{-2.3}+0.2\,\delta_{0.4}+0.3\,\delta_{1.9}$. The denoiser $h_\theta(\lambda,\alpha)$ is
+a tanh network with two hidden layers of width $64$ trained by Adam on $6\times10^4$ pairs for $100$ epochs, with $\alpha$
+uniform on $[0.02,0.9]$. Sampling is the reverse matrix SDE of Algorithm~\ref{alg:main} with $300$ steps, started from a GUE
+matrix, using the same random numbers for the exact and the learned scores at each $N$. At $\alpha=0.9$ the root-mean-square
+score error under the marginal of the two-atom law is $0.112$ for the network trained at $N=100$ and $0.049$ for $N=400$; at
+$\alpha=0.05$ it is $0.027$ and $0.008$. The exact score is the $N\to\infty$ free score, so a learned score trained at finite $N$
+can fall below it in $W_1$ at that $N$ (ratios below one in Table~\ref{tab:crossn}).
+
+\begin{table}[h]
+\centering
+\caption{Dictionary between classical and free spectral diffusion.}
+\label{tab:dictionary}
+\small
+\begin{tabular}{@{}p{0.42\columnwidth}p{0.52\columnwidth}@{}}
+\toprule
+Classical (vectors) & Free (spectra)\\
+\midrule
+Gaussian convolution & free convolution $\boxplus\gamma_v$\\
+score $-\nabla\log p_t$ & conjugate variable $\xi_{\mu_t}=2H\mu_t$\\
+Tweedie, denoising score matching & free Tweedie identity (App.~\ref{app:tweedie})\\
+reverse SDE & reverse free SDE \eqref{eq:reversesde}\\
+OU limit: Gaussian & free OU limit: semicircle only\\
+Langevin drift $\tfrac12\nabla\log p_*$ & $b_*=-H\mu_*=-\tfrac12\xi_{\mu_*}$ ($f\equiv1$)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\linewidth]{fig9_generative.png}
+\caption{Left: learned, exact, and coordinatewise scores at $\alpha_t=0.45$. Right:
+spectra generated by each, against the data spectrum.}
+\label{fig:generative}
 \end{figure}
 
 \end{document}

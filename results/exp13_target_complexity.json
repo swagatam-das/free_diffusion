@@ -1,0 +1,135 @@
+{
+  "experiment": "exp13_target_complexity",
+  "timestamp": "2026-10-06T19:28:30",
+  "M_particles": 400,
+  "T": 40.0,
+  "snapshot_interval": 0.1,
+  "flow": "designed, f = 1",
+  "Marchenko--Pastur | n_cuts": 1,
+  "Marchenko--Pastur | target_mass_per_cut": [
+    1.0
+  ],
+  "Marchenko--Pastur | final_fraction_per_cut": [
+    1.0
+  ],
+  "Marchenko--Pastur | W1_final": 0.0029404472757000285,
+  "Marchenko--Pastur | W1_min": 0.0009192146777914178,
+  "Marchenko--Pastur | time_to_W1_below_0p05": 2.1813381784589256,
+  "Marchenko--Pastur | W1_at_times": {
+    "2.0": 0.05748627110622764,
+    "4.0": 0.014225363112599454,
+    "8.0": 0.0010046314097388745,
+    "16.0": 0.0021334283628342684,
+    "24.0": 0.0029284217212592317,
+    "40.0": 0.0029404472757000285
+  },
+  "Marchenko--Pastur | stationarity_W1_from_target": 0.002454985394173409,
+  "Marchenko--Pastur | gap_closing_Lambda_star": [],
+  "Marchenko--Pastur | steps": 82749,
+  "two cuts, symmetric | n_cuts": 2,
+  "two cuts, symmetric | target_mass_per_cut": [
+    0.4999403931036905,
+    0.4999403931036905
+  ],
+  "two cuts, symmetric | final_fraction_per_cut": [
+    0.5,
+    0.5
+  ],
+  "two cuts, symmetric | W1_final": 0.010635862914773789,
+  "two cuts, symmetric | W1_min": 0.010635862914773789,
+  "two cuts, symmetric | time_to_W1_below_0p05": 7.237192971910134,
+  "two cuts, symmetric | W1_at_times": {
+    "2.0": 0.21463026651506797,
+    "4.0": 0.09580562508606397,
+    "8.0": 0.04501032574648202,
+    "16.0": 0.022144744762161515,
+    "24.0": 0.015772724272891444,
+    "40.0": 0.010635862914773789
+  },
+  "two cuts, symmetric | stationarity_W1_from_target": 0.0032763816100293015,
+  "two cuts, symmetric | gap_closing_Lambda_star": [
+    1.1067198163407832
+  ],
+  "two cuts, symmetric | steps": 17579,
+  "two cuts, 0.3/0.7 | n_cuts": 2,
+  "two cuts, 0.3/0.7 | target_mass_per_cut": [
+    0.299951577498313,
+    0.6999293160554405
+  ],
+  "two cuts, 0.3/0.7 | final_fraction_per_cut": [
+    0.3175,
+    0.6825
+  ],
+  "two cuts, 0.3/0.7 | W1_final": 0.05454885467185282,
+  "two cuts, 0.3/0.7 | W1_min": 0.05454885467185282,
+  "two cuts, 0.3/0.7 | time_to_W1_below_0p05": null,
+  "two cuts, 0.3/0.7 | W1_at_times": {
+    "2.0": 0.25902216699665337,
+    "4.0": 0.14455071186446364,
+    "8.0": 0.10708651631626563,
+    "16.0": 0.08059748056483856,
+    "24.0": 0.06802938336188463,
+    "40.0": 0.05454885467185282
+  },
+  "two cuts, 0.3/0.7 | stationarity_W1_from_target": 0.00366405686687263,
+  "two cuts, 0.3/0.7 | gap_closing_Lambda_star": [
+    1.1505150062272966
+  ],
+  "two cuts, 0.3/0.7 | steps": 23641,
+  "three cuts | n_cuts": 3,
+  "three cuts | target_mass_per_cut": [
+    0.49989647803593734,
+    0.19993044094153187,
+    0.29992235497062125
+  ],
+  "three cuts | final_fraction_per_cut": [
+    0.48,
+    0.2225,
+    0.2975
+  ],
+  "three cuts | W1_final": 0.05883984333212338,
+  "three cuts | W1_min": 0.05883984333212338,
+  "three cuts | time_to_W1_below_0p05": null,
+  "three cuts | W1_at_times": {
+    "2.0": 0.46597904022929404,
+    "4.0": 0.286524505406601,
+    "8.0": 0.17031763485358004,
+    "16.0": 0.10349357718020707,
+    "24.0": 0.07886414229872456,
+    "40.0": 0.05883984333212338
+  },
+  "three cuts | stationarity_W1_from_target": 0.003334534025915598,
+  "three cuts | gap_closing_Lambda_star": [
+    1.1421779176688172,
+    0.6319632502031607
+  ],
+  "three cuts | steps": 47167,
+  "MP + two bumps | n_cuts": 3,
+  "MP + two bumps | target_mass_per_cut": [
+    0.9699997386665873,
+    0.015000767027150592,
+    0.014999494306261999
+  ],
+  "MP + two bumps | final_fraction_per_cut": [
+    0.945,
+    0.02,
+    0.035
+  ],
+  "MP + two bumps | W1_final": 0.06633273387308632,
+  "MP + two bumps | W1_min": 0.06633273387308632,
+  "MP + two bumps | time_to_W1_below_0p05": null,
+  "MP + two bumps | W1_at_times": {
+    "2.0": 0.514321814877529,
+    "4.0": 0.3030271958628808,
+    "8.0": 0.18131038773156496,
+    "16.0": 0.11549616354899359,
+    "24.0": 0.08963548435493908,
+    "40.0": 0.06633273387308632
+  },
+  "MP + two bumps | stationarity_W1_from_target": 0.004504769987667319,
+  "MP + two bumps | gap_closing_Lambda_star": [
+    1.078444037721391,
+    1.5953937500945634
+  ],
+  "MP + two bumps | steps": 72092
+}

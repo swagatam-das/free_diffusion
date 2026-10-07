@@ -28,3 +28,14 @@ to use a local copy.  `make_figures/` regenerates three of the paper's figures (
 sign the drift is repulsive, the target is not stationary, and the simulated spectrum spreads out
 instead of recovering the bulk.  In `freeddpm`, `reverse.stationarity_residual` and `tests/` pin the
 same convention.
+
+## Schematic figures
+
+`make_figures/` holds one script per schematic figure of the paper; each writes its PNG to `./out/` and is run from the repository root:
+
+```bash
+python reproduce/make_figures/make_fig_warmup.py     # Figure 1
+python reproduce/make_figures/make_fig_pipeline.py   # Figure 2
+python reproduce/make_figures/make_fig_concept.py    # Figure 3 (reads results/exp11_volatility.json)
+python reproduce/make_figures/make_fig_realdata.py   # real-data figure (needs data/, see above)
+```

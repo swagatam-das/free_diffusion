@@ -1,0 +1,30 @@
+{
+  "experiment": "exp12_designed_reverse",
+  "timestamp": "2026-10-06T18:14:53",
+  "M_forward_particles": 800,
+  "N_generated": 400,
+  "T": 5.0,
+  "snapshot_interval": 0.005,
+  "repeats": 5,
+  "atoms": [
+    0.7,
+    2.1
+  ],
+  "v0": 0.03,
+  "L": 0.5,
+  "W1_prior_to_data_mean": 0.4298459765417689,
+  "W1_two_data_samples_mean": 0.0015327762894576352,
+  "W1_two_data_samples_std": 0.00020346212938326437,
+  "W1_generated_to_data_f=1_mean": 0.005212809873292976,
+  "W1_generated_to_data_f=1_std": 0.0010676294787241784,
+  "W1_final_forward_to_prior_f=1": 0.011016115236554803,
+  "forward_steps_f=1": 19093,
+  "tracking_W1_max_f=1": 0.008516527493491362,
+  "tracking_W1_final_f=1": 0.006207314647980859,
+  "W1_generated_to_data_f(x)_mean": 0.0063029890420892324,
+  "W1_generated_to_data_f(x)_std": 0.0021672190541186125,
+  "W1_final_forward_to_prior_f(x)": 0.011897386027434042,
+  "forward_steps_f(x)": 11888,
+  "tracking_W1_max_f(x)": 0.01253835424669391,
+  "tracking_W1_final_f(x)": 0.010470899645812376
+}
